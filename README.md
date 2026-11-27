@@ -1,164 +1,999 @@
-# Портфолио разработчика на Arch Linux
+# Сайт-резюме от HTML до микросервисов: пошаговый практикум
 
-Практикум для IntelliJ IDEA Ultimate · Java 21 · Spring Boot 4.1.2 · Maven · PostgreSQL 17 · Docker Compose · HTML, CSS и JavaScript · Unity Web
+> **Среда:** Arch Linux · IntelliJ IDEA Ultimate · HTML · CSS · JavaScript · Java 21 · Maven Wrapper · Spring Boot · PostgreSQL · Flyway · Docker Compose · Nginx · Unity Web / Brotli  
+> **Принцип обучения:** каждая новая технология появляется только тогда, когда для неё возникает реальная задача. Сначала делаем работающий фронтенд, потом сервер, затем отдельный сервис данных и только после этого базу данных и контейнеризацию.
 
-**Как проходить.** [Карта сайта](#map) · [Arch Linux и IDEA](#setup) ·
-[PostgreSQL и repository-service](#database) · [Резюме и web-service](#resume) ·
-[Демо](#demos) · [Docker Compose](#containers) · [Unity Web](#unity-web) ·
-[Проверка результата](#acceptance)
+## Содержание
 
-<a id="map"></a>
+1. [Что создаём и зачем](#что-создаём-и-зачем)
+2. [Часть I. Фронтенд без Java и базы данных (шаги 1–74)](#часть-i-фронтенд-без-java-и-базы-данных-шаги-174)
+3. [Часть II. Первый backend: Java, Maven, Spring Boot (шаги 75–91)](#часть-ii-первый-backend-java-maven-spring-boot-шаги-7591)
+4. [Часть III. Два сервиса, но ещё без PostgreSQL (шаги 92–108)](#часть-iii-два-сервиса-но-ещё-без-postgresql-шаги-92108)
+5. [Часть IV. PostgreSQL, миграции, SQL и сохранение данных (шаги 109–155)](#часть-iv-postgresql-миграции-sql-и-сохранение-данных-шаги-109155)
+6. [Часть V. Docker для приложений (шаги 156–166)](#часть-v-docker-для-приложений-шаги-156166)
+7. [Часть VI. Unity, Brotli и Nginx (шаги 167–180)](#часть-vi-unity-brotli-и-nginx-шаги-167180)
+8. [Часть VII. Тестирование и публикация (шаги 181–200)](#часть-vii-тестирование-и-публикация-шаги-181200)
+9. [Итоговая структура и чек-лист](#итоговая-структура-и-чек-лист)
+10. [Официальная документация](#официальная-документация)
 
-## 0. Что получится
+---
 
-Сайт открывается с резюме, а каждое умение можно проверить в живом демо. На главной будут имя, специализация, короткий рассказ о себе, опыт или учебные проекты, навыки с доказательствами и рабочие контакты. В примерах личные данные оставлены как поля для заполнения.
+## Что создаём и зачем
 
-| Страница | Что демонстрирует |
-| --- | --- |
-| `/` | Резюме, проекты, навыки и ссылки на демо |
-| `/catalog.html` · `/catalog.html#search-form` | Номера страниц, фильтр по категории и поиск с подсказками |
-| `/feed.html` | Бесконечная прокрутка с кнопкой «Загрузить ещё» |
-| `/categories.html` | Точное количество товаров по категориям на 50 000 тестовых строк |
-| `/board.html` | Kanban-доска. Карточки можно переносить и сортировать, порядок сохраняется |
-| `/upload.html` | Перетаскивание файлов из системы и выбор через стандартный диалог |
-| `/gallery.html` | Горизонтальная карусель с кнопками и свайпом |
-| `/ui.html#modal` · `/ui.html#dropdown` · `/ui.html#animations` | Модальное окно, кастомный селектор, CSS-переходы и анимация |
-| `/unity/` | Ваша сборка Unity Web с Brotli. Этот маршрут обслуживает Nginx |
+Это **личный сайт-резюме Java-разработчика**. На главной странице размещаются сведения о тебе, навыки, опыт, контакты и ссылки на работающие мини-проекты. Демо не заменяют резюме, а доказывают заявленные навыки.
 
-Демо — часть портфолио, а не резюме вместо резюме. Например, подпишите ссылку на каталог так: «Пагинация и SQL-поиск по 50 000 тестовых товаров». Не выдавайте сгенерированные товары за данные реального магазина.
+| Страница | Что демонстрирует | Технологии |
+|---|---|---|
+| `/` | Имя, роль, «Обо мне», образование, проекты, навыки, контакты | HTML, CSS, JS |
+| `/catalog.html` | Поиск с подсказками, пагинация по страницам, бесконечная лента, 12–50 тыс. элементов, счётчики категорий | JS → Spring MVC → SQL |
+| `/board.html` | Kanban-доска, изменение порядка и перетаскивание карточек | Drag and Drop, REST |
+| `/upload.html` | Drag and drop файлов, предпросмотр, позже серверная загрузка | File API, multipart |
+| `/gallery.html` | Прокрутка и карусель фотографий | CSS Scroll Snap, JS |
+| `/ui.html` | Модальные окна, кастомный dropdown, анимации | HTML, CSS, DOM, ARIA |
+| `/unity.html` | Встраивание Unity Web | WebAssembly, Brotli, Nginx |
 
-**Архитектура.** В режиме Docker браузер открывает Nginx. Nginx отдаёт Unity из отдельной папки и проксирует остальные запросы в `web-service`. Это Spring Boot-приложение отдаёт HTML/CSS/JS, принимает файлы и предоставляет публичное API. Оно вызывает по HTTP отдельный `repository-service`. Только `repository-service` знает адрес и пароль PostgreSQL, применяет миграции и выполняет SQL. Сервисы собираются в отдельные JAR и запускаются независимо. `repository-service` — отдельный процесс и контейнер, а не интерфейс Java с аннотацией `@Repository` внутри веб-приложения.
+**Эволюция архитектуры** — именно в таком порядке:
 
-| Откуда → куда | Локально при отладке | В Docker Compose |
-| --- | --- | --- |
-| Браузер → сайт | `localhost:8080` | `localhost:8081` → Nginx |
-| `web-service` → `repository-service` | `http://127.0.0.1:8082` | `http://repository:8082` |
-| `repository-service` → PostgreSQL | `127.0.0.1:5433` | `db:5432` |
-| PostgreSQL → данные | Docker-том `pgdata` | Тот же том |
-| `web-service` → принятые файлы | `./uploads` | Docker-том `uploads` |
+```text
+A. Браузер
+   HTML + CSS + JavaScript
+   Демо-данные: массивы JS и localStorage
 
-Это учебное разделение двух сервисов. Здесь нет общей базы для двух приложений, очередей и Kubernetes. Отдельный сервис данных даёт повод освоить сетевые границы, таймауты и диагностику ошибок. В более крупной системе границы обычно выбирают по бизнес-функциям и владельцам данных, а не выносят весь SQL в один универсальный сервис.
+B. Один backend
+   Браузер ─HTTP─> web-service (Spring Boot)
+   Данные: временно Java-объекты в памяти
 
-**Что вы изучаете.** Maven собирает код в JAR и разрешает зависимости. Spring Framework связывает Java-компоненты и обрабатывает HTTP и транзакции. Spring Boot настраивает сервер и типовые компоненты, чтобы вы могли сосредоточиться на коде. PostgreSQL хранит и считает данные. Docker Compose запускает процессы вместе. HTML описывает элементы страницы, CSS задаёт их вид, JavaScript связывает интерфейс с API.
+C. Два backend-сервиса
+   Браузер ─HTTP─> web-service ─HTTP─> repository-service
+   Данные: временно Java-объекты в памяти repository-service
 
-На каждом этапе сначала запустите и проверьте минимальную версию. Код ниже раскладывается по файлам, указанные пути отсчитываются от корня проекта. Папка `src/main/resources/static` принадлежит только веб-модулю. Маршруты страниц со знаком `.html` оставлены намеренно: Spring отдаёт файлы без контроллеров и роутера JavaScript.
+D. Постоянное хранилище
+   Браузер ─HTTP─> web-service ─HTTP─> repository-service ─JDBC─> PostgreSQL
 
-<a id="setup"></a>
+E. Развёртывание
+   Браузер ─> Nginx ─> web-service ─> repository-service ─> PostgreSQL
+                 └──> Unity Web (.br)
+   Все серверные компоненты работают в контейнерах
+```
 
-## 1. Подготовьте Arch Linux
+В итоговой системе **только `repository-service` соединяется с PostgreSQL**. `web-service` отдаёт статические страницы и публичное API; к внутреннему сервису он обращается по HTTP. У сервисов разные JAR и Docker-контейнеры. Это учебная архитектура: в коммерческих системах границы микросервисов чаще выбирают по бизнес-доменам, а не только по техническому слою хранилища.
 
-Обновите систему и поставьте JDK, Docker, Compose, Git и curl. Maven из пакетов не нужен, поскольку будем пользоваться Maven Wrapper из проекта.
+| Технология | Впервые нужна | Зачем |
+|---|---|---|
+| HTML | Шаг 4 | Структура резюме |
+| CSS | Шаг 5 | Оформление, адаптивность, анимации |
+| JavaScript | Шаг 12 и далее | Интерактивность, состояние, перетаскивание |
+| Java 21 | Шаг 75 | Серверная логика |
+| Maven Wrapper | Шаг 76 | Сборка Spring Boot-приложения |
+| Spring Boot | Шаг 76 | HTTP API и раздача сайта |
+| `repository-service` | Шаг 92 | Отделение ответственности за данные |
+| Docker | Шаг 109 | Сначала удобный запуск PostgreSQL |
+| PostgreSQL | Шаг 109 | Сохранение и SQL-запросы |
+| Flyway | Шаг 113 | Контролируемые версии схемы БД |
+| Docker для сервисов | Шаг 158 | Воспроизводимый запуск всей системы |
+| Nginx, Unity, Brotli | Шаг 167+ | Публикация Web-сборки с правильными заголовками |
 
-~~~bash
-sudo pacman -Syu --needed jdk21-openjdk docker docker-compose git curl
-sudo systemctl enable --now docker.service
+**Ритм работы.** Сделай один небольшой шаг, открой страницу или вызови API, проверь результат, затем сохрани изменения в Git. Каждый раздел заканчивается контрольной точкой. Не добавляй новую технологию, пока не работает предыдущая.
 
+---
+
+# Часть I. Фронтенд без Java и базы данных (шаги 1–74)
+
+## Этап 1. Пустой проект и первая страница
+
+### Шаг 1. Создай пустой проект в IntelliJ IDEA Ultimate
+
+**File → New → Project → Empty Project**, имя `portfolio-lab`. Например, директория `~/Projects/portfolio-lab`. Пока **не** выбирай Spring Boot или Maven. Для работы со статическими страницами они не нужны.
+
+### Шаг 2. Создай структуру фронтенда
+
+Через **Project** (`Alt+1`) → правой кнопкой → **New → Directory / File** создай:
+
+```text
+portfolio-lab/
+└── frontend/
+    ├── index.html
+    ├── catalog.html
+    ├── board.html
+    ├── upload.html
+    ├── gallery.html
+    ├── ui.html
+    ├── unity.html
+    └── assets/
+        ├── css/
+        │   └── style.css
+        ├── js/
+        │   ├── main.js
+        │   ├── catalog.js
+        │   ├── board.js
+        │   ├── upload.js
+        │   ├── gallery.js
+        │   └── ui.js
+        └── images/
+```
+
+HTML задаёт структуру, CSS — оформление, JavaScript — поведение. Позднее всё это перенесём в ресурсы Spring Boot почти без изменений.
+
+### Шаг 3. Инициализируй Git
+
+В терминале IDEA (`Alt+F12`):
+
+```bash
+sudo pacman -S --needed git
+git init
+```
+
+Создай `.gitignore` в корне:
+
+```gitignore
+.idea/
+*.iml
+target/
+.env
+.DS_Store
+```
+
+```bash
+git add .
+git commit -m "Initial frontend project"
+```
+
+Если Git попросит имя и email, настрой их с помощью `git config --global user.name ...` и `git config --global user.email ...`.
+
+### Шаг 4. Напиши HTML главной страницы
+
+`frontend/index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Моё портфолио | Java Developer</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/main.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+    <a class="logo" href="index.html">Portfolio</a>
+    <nav aria-label="Основная навигация">
+        <a href="index.html">Обо мне</a>
+        <a href="catalog.html">Каталог</a>
+        <a href="board.html">Доска</a>
+        <a href="upload.html">Файлы</a>
+        <a href="gallery.html">Галерея</a>
+        <a href="ui.html">UI</a>
+        <a href="unity.html">Unity</a>
+    </nav>
+</header>
+<main>
+    <section class="hero">
+        <p>Привет! Меня зовут [Имя]</p>
+        <h1>Java Backend Developer</h1>
+        <p>Изучаю Spring Boot, PostgreSQL, Docker и микросервисы.</p>
+        <a class="button" href="#projects">Смотреть проекты</a>
+    </section>
+    <section id="about">
+        <h2>Обо мне</h2>
+        <p>Здесь будет краткая информация обо мне.</p>
+    </section>
+    <section id="skills">
+        <h2>Мои навыки</h2>
+        <p>Java, HTML, CSS, JavaScript</p>
+    </section>
+    <section id="projects">
+        <h2>Мои проекты</h2>
+        <div class="project-grid">
+            <article class="project-card">
+                <h3>Каталог товаров</h3>
+                <p>Пагинация, поиск и фильтрация.</p>
+                <a href="catalog.html">Открыть демо</a>
+            </article>
+        </div>
+    </section>
+    <section id="contacts">
+        <h2>Контакты</h2>
+        <p>GitHub, email и другие ссылки.</p>
+    </section>
+</main>
+<footer><p>Моё портфолио</p></footer>
+</body>
+</html>
+```
+
+Здесь `header` — шапка, `nav` — навигация, `main` — основное содержимое, `section` — раздел, `article` — самостоятельная карточка, `footer` — нижняя часть сайта. Выбирай элементы по смыслу, а не по внешнему виду. [MDN: HTML](https://developer.mozilla.org/ru/docs/Learn_web_development/Core/Structuring_content).
+
+### Шаг 5. Добавь CSS
+
+`frontend/assets/css/style.css`:
+
+```css
+:root {
+    --background: #101827;
+    --surface: #1d293b;
+    --text: #f1f5f9;
+    --accent: #60a5fa;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    line-height: 1.6;
+}
+.site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 20px 6%;
+    background: var(--surface);
+}
+.site-header nav { display: flex; flex-wrap: wrap; gap: 16px; }
+a { color: var(--accent); }
+.hero { padding: 90px 6%; }
+section:not(.hero) { padding: 40px 6%; }
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+}
+.project-card {
+    padding: 24px;
+    border-radius: 12px;
+    background: var(--surface);
+}
+.button {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #101827;
+    text-decoration: none;
+    transition: transform 200ms, background 200ms;
+}
+.button:hover { transform: translateY(-3px); background: #93c5fd; }
+```
+
+Изучи CSS-переменные, Flexbox, Grid, `box-sizing`, отступы, `transition`. [MDN: CSS](https://developer.mozilla.org/ru/docs/Learn_web_development/Core/Styling_basics).
+
+### Шаг 6. Открой сайт в браузере
+
+В IDEA открой `index.html` и выбери **View → Open in Browser** (или `Alt+F2`). Если используешь предпросмотр, открывай сайт по `http://...`, а не через `file://`: позже `fetch()` будет работать с HTTP API. [JetBrains: открытие в браузере](https://www.jetbrains.com/help/idea/editing-html-files.html).
+
+**Контрольная точка №1:** главная страница открывается; видны карточка проекта и навигация; изменение CSS сразу заметно. Пока ни Java, ни Maven, ни БД.
+
+## Этап 2. Преврати скелет в реальное резюме
+
+Выполняй отдельно, сохраняя Git-коммит после законченного блока.
+
+| Шаг | Задача | Что изучить |
+|---:|---|---|
+| 7 | Заполни блок «Обо мне»: специализация, цели, образование, опыт | Семантический HTML |
+| 8 | Создай карточки навыков: Java, Spring, Docker, SQL, JS | CSS Grid и повторное использование классов |
+| 9 | Добавь карточки всех будущих демо | `article`, ссылки |
+| 10 | Добавь рабочие ссылки GitHub и email | `<a>`, `mailto:` |
+| 11 | Сделай адаптивное меню | Flexbox, media queries |
+| 12 | Добавь переключатель светлой и тёмной тем | JS, CSS-переменные, `localStorage` |
+| 13 | Сделай анимацию наведения кнопок и изменения цвета | `:hover`, `transform`, `transition` |
+| 14 | Добавь анимацию появления блоков при прокрутке | `@keyframes`, `IntersectionObserver` |
+| 15 | Проверь доступность с клавиатуры и ограничение анимации | `:focus-visible`, `prefers-reduced-motion` |
+
+Для шага 12 добавь кнопку с `id="theme-button"`, CSS-правило `.light-theme` и обработчик в `main.js`:
+
+```javascript
+const themeButton = document.querySelector('#theme-button');
+themeButton?.addEventListener('click', () => {
+    document.body.classList.toggle('light-theme');
+    localStorage.setItem('theme',
+        document.body.classList.contains('light-theme') ? 'light' : 'dark');
+});
+// При старте прочитай localStorage.getItem('theme')
+// и восстанови нужный класс на body.
+```
+
+Анимации должны уважать системную настройку пользователя:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+```
+
+**Контрольная точка №2:** сайт уже выглядит как резюме; карточки ведут на будущие демо; мобильная версия и переключатель темы работают. [MDN: localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage), [MDN: media queries](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries).
+
+## Этап 3. Модальное окно, dropdown и CSS-анимации
+
+### Шаг 16. Создай модальное окно
+
+В `ui.html`:
+
+```html
+<button id="open-modal">Открыть окно</button>
+<dialog id="demo-modal">
+    <h2>Пример модального окна</h2>
+    <p>Создано на HTML и JavaScript.</p>
+    <form method="dialog"><button>Закрыть</button></form>
+</dialog>
+<script src="assets/js/ui.js" defer></script>
+```
+
+В `ui.js`:
+
+```javascript
+const modal = document.querySelector('#demo-modal');
+document.querySelector('#open-modal')?.addEventListener('click', () => {
+    modal.showModal();
+});
+```
+
+`<dialog>` уже обеспечивает модальную семантику и стандартное закрытие по Escape. [MDN: dialog](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog).
+
+| Шаг | Задача |
+|---:|---|
+| 17 | Стилизуй окно и `dialog::backdrop` |
+| 18 | Добавь плавную анимацию открытия |
+| 19 | Проверь закрытие по Escape и возврат фокуса |
+| 20 | Добавь второе модальное окно — форму обратной связи без сервера |
+| 21 | Создай обычный `<select>` и изучи его поведение |
+| 22 | Замени его кнопкой «Выбрать категорию» и списком вариантов |
+| 23 | Реализуй скрытие и раскрытие списка |
+| 24 | Добавь переключение по нажатию |
+| 25 | При выборе варианта изменяй текст кнопки и выбранное значение |
+| 26 | Закрывай список по клику вне компонента |
+| 27 | Добавь стрелки, Enter, Escape, ARIA-атрибуты и видимый фокус |
+
+Кастомный dropdown сложнее стандартного `<select>`. Важно сначала добиться доступного управления с клавиатуры, потом заниматься анимацией. [WAI-ARIA Listbox](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/).
+
+**Контрольная точка №3:** модальное окно и селектор работают мышью и клавиатурой.
+
+## Этап 4. Галерея фотографий
+
+### Шаг 28. Добавь изображения
+
+Помести фотографии в `frontend/assets/images/`, затем в `gallery.html`:
+
+```html
+<div class="gallery-track" id="gallery-track">
+    <img src="assets/images/photo1.jpg" alt="Фото 1">
+    <img src="assets/images/photo2.jpg" alt="Фото 2">
+    <img src="assets/images/photo3.jpg" alt="Фото 3">
+</div>
+```
+
+### Шаг 29. Сделай горизонтальную прокрутку с CSS Scroll Snap
+
+```css
+.gallery-track {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+}
+.gallery-track img {
+    flex: 0 0 100%;
+    width: 100%;
+    max-height: 500px;
+    object-fit: cover;
+    scroll-snap-align: start;
+}
+```
+
+| Шаг | Задача |
+|---:|---|
+| 30 | Добавь кнопки «Назад» и «Вперёд» |
+| 31 | В `gallery.js` добавь прокрутку через `scrollBy()` |
+| 32 | Покажи индикатор текущего слайда |
+| 33 | Проверь мобильную вёрстку и свайпы |
+| 34 | Добавь просмотр фотографии в `<dialog>` |
+| 35 | Для изображений ниже первого экрана используй `loading="lazy"` |
+
+**Контрольная точка №4:** галерея прокручивается свайпом и кнопками; фото открываются крупнее. [MDN: CSS Scroll Snap](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_scroll_snap).
+
+## Этап 5. Каталог: тысячи элементов, поиск, счётчики, два вида пагинации
+
+### Шаг 36. Подготовь HTML
+
+`catalog.html` (включи структуру `html`, `head` и общие стили, как на главной):
+
+```html
+<h1>Демонстрационный каталог</h1>
+<label for="search">Поиск товаров</label>
+<input id="search" type="search" placeholder="Например, монитор" autocomplete="off">
+<ul id="suggestions" aria-label="Подсказки поиска"></ul>
+<p id="counter"></p>
+<div id="categories"></div>
+<div id="products" class="project-grid"></div>
+<nav aria-label="Пагинация">
+    <button id="prev-page">Назад</button>
+    <span id="page-info"></span>
+    <button id="next-page">Вперёд</button>
+</nav>
+<script src="assets/js/catalog.js" defer></script>
+```
+
+### Шаг 37. Сгенерируй 12 000 товаров на клиенте
+
+`catalog.js`:
+
+```javascript
+const categories = ['Монитор', 'Клавиатура', 'Мышь', 'Ноутбук'];
+const products = Array.from({ length: 12000 }, (_, index) => {
+    const category = categories[index % categories.length];
+    return {
+        id: index + 1,
+        name: `${category} модель ${index + 1}`,
+        category
+    };
+});
+const state = { page: 1, pageSize: 24, query: '', category: null };
+```
+
+Сначала всё в браузере: так легко понять поведение каталога независимо от сервера.
+
+### Шаг 38. Реализуй пагинацию
+
+Продолжение `catalog.js`:
+
+```javascript
+const productsContainer = document.querySelector('#products');
+const counter = document.querySelector('#counter');
+const pageInfo = document.querySelector('#page-info');
+
+function getFilteredProducts() {
+    return products.filter(product =>
+        product.name.toLowerCase().includes(state.query) &&
+        (!state.category || product.category === state.category)
+    );
+}
+
+function renderCatalog() {
+    const filtered = getFilteredProducts();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const start = (state.page - 1) * state.pageSize;
+    const visible = filtered.slice(start, start + state.pageSize);
+
+    productsContainer.replaceChildren();
+    for (const product of visible) {
+        const card = document.createElement('article');
+        card.className = 'project-card';
+        const title = document.createElement('h3');
+        title.textContent = product.name;
+        card.append(title);
+        productsContainer.append(card);
+    }
+    counter.textContent = `Найдено: ${filtered.length}`;
+    pageInfo.textContent = `${state.page} / ${totalPages}`;
+    document.querySelector('#prev-page').disabled = state.page === 1;
+    document.querySelector('#next-page').disabled = state.page === totalPages;
+}
+
+document.querySelector('#prev-page').addEventListener('click', () => {
+    state.page--;
+    renderCatalog();
+});
+document.querySelector('#next-page').addEventListener('click', () => {
+    state.page++;
+    renderCatalog();
+});
+renderCatalog();
+```
+
+`filter()` выбирает подходящие объекты, `slice()` — только одну страницу, `replaceChildren()` очищает старую разметку. Мы **не создаём 12 000 DOM-карточек**, а выводим 24.
+
+### Шаг 39. Добавь текстовый поиск
+
+```javascript
+const search = document.querySelector('#search');
+search.addEventListener('input', () => {
+    state.query = search.value.trim().toLowerCase();
+    state.page = 1;
+    renderCatalog();
+});
+```
+
+### Шаг 40. Реализуй подсказки
+
+Напиши `renderSuggestions()` по алгоритму:
+
+1. Получи текст запроса.
+2. При пустом запросе очисти и спрячь подсказки.
+3. Отфильтруй товары или уникальные названия.
+4. Покажи не более 5 вариантов.
+5. Для каждого варианта создай кнопку, а не неинтерактивный текст.
+6. При выборе заполни поле и обнови каталог.
+7. Добавь debounce в 200–300 мс с `setTimeout` и `clearTimeout`.
+
+### Шаг 41. Подсчитай элементы по категориям
+
+```javascript
+const counts = products.reduce((result, product) => {
+    result[product.category] = (result[product.category] ?? 0) + 1;
+    return result;
+}, {});
+console.log(counts);
+```
+
+В этом наборе по 3000 товаров каждой категории. Отобрази значения в `#categories`.
+
+### Шаг 42. Добавь фильтр по категориям
+
+Сделай кнопки категорий. По нажатию обновляй `state.category`, сбрасывай `state.page` и запускай `renderCatalog()`. Убедись, что поиск и категория действуют совместно.
+
+### Шаг 43. Подготовь режим бесконечной ленты
+
+Добавь в разметку `<div id="scroll-sentinel"></div>` и переключатель режимов «Страницы / Лента».
+
+### Шаг 44. Изучи `IntersectionObserver`
+
+```javascript
+const sentinel = document.querySelector('#scroll-sentinel');
+const observer = new IntersectionObserver(entries => {
+    if (!entries[0].isIntersecting) return;
+    // Только в режиме ленты:
+    // если не идёт загрузка и есть следующая порция,
+    // увеличь страницу и ДОБАВЬ новые карточки в конец списка.
+}, { rootMargin: '200px' });
+observer.observe(sentinel);
+```
+
+Это каркас, а не вся реализация: надо учитывать режим, состояние загрузки и конец списка. Для ленты **не** очищай уже выведенные карточки при каждой новой порции. [MDN: IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API).
+
+| Шаг | Задача |
+|---:|---|
+| 45 | Добавь индикатор загрузки следующей порции |
+| 46 | Покажи «Товары закончились» в конце ленты |
+| 47 | При новом поиске сбрасывай страницу или накопленную ленту |
+| 48 | Сохраняй запрос, категорию и номер страницы в URL-параметрах |
+| 49 | Сравни работу на 12 000 и 50 000 объектов; проверь вкладку Performance |
+
+**Контрольная точка №5:** есть страничная пагинация и бесконечный скролл, подсказки, фильтры, счётчики и большие тестовые наборы **без backend**.
+
+## Этап 6. Kanban-доска с drag and drop
+
+На `board.html` сделай три колонки: **To Do**, **In Progress**, **Done**. У задачи должны быть `id`, `title`, `status`, `position`.
+
+| Шаг | Задача |
+|---:|---|
+| 50 | Нарисуй три колонки |
+| 51 | Создай массив объектов задач |
+| 52 | Отрисуй карточки через JS |
+| 53 | Добавь карточкам `draggable="true"` |
+| 54 | В `dragstart` сохрани ID через `dataTransfer.setData()` |
+| 55 | В `dragover` целевой колонки вызови `event.preventDefault()` |
+| 56 | В `drop` прочитай ID и измени `status` |
+| 57 | Перерисуй карточки из массива |
+| 58 | Реализуй перестановку внутри колонки, обновляя `position` |
+| 59 | Сохраняй массив в `localStorage` |
+| 60 | Восстанавливай задачи после F5 |
+| 61 | Добавь создание и удаление задачи через модальное окно |
+| 62 | Добавь перемещение с клавиатуры и альтернативу для сенсорных экранов |
+
+Не путай **перенос между колонками** с **изменением порядка внутри колонки** — это два разных сценария. [MDN: Drag and Drop API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API).
+
+**Контрольная точка №6:** можно создавать, удалять и перемещать задачи. После обновления страницы состояние остаётся в этом браузере.
+
+## Этап 7. Drag and drop файлов (пока без сервера)
+
+| Шаг | Задача |
+|---:|---|
+| 63 | Создай зону с текстом «Перетащи файл сюда» |
+| 64 | Добавь обычный `<input type="file">` |
+| 65 | Обработай `dragover` и `drop` |
+| 66 | Прочитай `event.dataTransfer.files` |
+| 67 | Покажи имя, размер и тип каждого файла |
+| 68 | Для изображений создай превью через `URL.createObjectURL()`; освобождай URL после использования |
+| 69 | Покажи сообщение об ошибке для слишком больших файлов, например больше 10 МБ |
+| 70 | Сделай кнопку «Загрузить», но без отправки — сервер ещё не нужен |
+
+Пример в `upload.js`:
+
+```javascript
+const dropZone = document.querySelector('#drop-zone');
+dropZone.addEventListener('dragover', event => event.preventDefault());
+dropZone.addEventListener('drop', event => {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files);
+    files.forEach(file => console.log(file.name, file.size, file.type));
+});
+```
+
+HTML-элемент `#drop-zone` сначала нужно создать в `upload.html`. [MDN: File API](https://developer.mozilla.org/en-US/docs/Web/API/File_API).
+
+**Контрольная точка №7:** перетаскиваемые и выбранные файлы видны с их свойствами и превью; ничего не отправляется.
+
+## Этап 8. Заготовка Unity-страницы
+
+| Шаг | Задача |
+|---:|---|
+| 71 | Создай `unity.html` с описанием Unity-проекта |
+| 72 | Добавь контейнер для будущего Web-приложения |
+| 73 | Размести описание управления, размера и технологий |
+| 74 | Добавь заглушку «Unity Web Demo появится здесь» |
+
+**Итог части I:** зафиксируй работающий фронтенд:
+
+```bash
+git add .
+git commit -m "Complete interactive frontend prototype"
+```
+
+Не устанавливай Spring, PostgreSQL или Docker, пока не закончены необходимые для тебя фронтенд-демо.
+
+---
+# Часть II. Первый backend: Java, Maven, Spring Boot (шаги 75–91)
+
+## Этап 9. Устанавливаем Java только после готового фронтенда
+
+### Шаг 75. Установи JDK 21 на Arch Linux
+
+```bash
+sudo pacman -Syu
+sudo pacman -S --needed jdk21-openjdk
 archlinux-java status
 java -version
 javac -version
-docker compose version
-sudo docker run --rm hello-world
-~~~
+```
 
-Если текущая Java не 21 и вы хотите сделать JDK 21 системным, выполните `sudo archlinux-java set java-21-openjdk`. Это необязательно, если JDK 21 явно выбран в IDEA и настроен в вашем терминале. Системный JDK для IDE обычно находится в `/usr/lib/jvm/java-21-openjdk`.
+При необходимости выбери JDK 21 в **File → Project Structure → Project SDK**. Системную версию Java менять необязательно: в IDEA можно выбрать JDK для конкретного проекта. [ArchWiki: Java](https://wiki.archlinux.org/title/Java).
 
-Чтобы IDEA и ваш обычный пользователь могли обращаться к Docker через системный сокет, на личной учебной машине можно выполнить `sudo usermod -aG docker "$USER"`, полностью выйти из графической сессии, снова войти и проверить `docker info`. Членство в `docker` даёт привилегии уровня root. Если это неприемлемо, используйте rootless Docker либо работайте с Docker через `sudo` в терминале и запускайте Java в IDEA независимо. Не исправляйте права командой `chmod 666 /var/run/docker.sock`.
+### Шаг 76. Создай `web-service` через Spring Initializr
 
-IDEA установите через JetBrains Toolbox или официальный архив. В актуальной IDEA функции Ultimate доступны по подписке. Проверьте плагины Spring, Docker и Database Tools and SQL. Нужные действия проще найти через **Find Action** (`Ctrl+Shift+A`), если меню отличается.
+В IDEA открой **File → New → Module → Spring Boot** (расположение зависит от версии). Альтернатива: сгенерируй проект на [start.spring.io](https://start.spring.io/) и распакуй в `portfolio-lab/web-service`.
 
-Подробнее в документации — [Docker в ArchWiki](https://wiki.archlinux.org/title/Docker), [JDK 21 в Arch](https://archlinux.org/packages/extra/x86_64/jdk21-openjdk/), [установка IDEA](https://www.jetbrains.com/help/idea/installation-guide.html), [права Docker](https://docs.docker.com/engine/install/linux-postinstall/), [rootless Docker](https://docs.docker.com/engine/security/rootless/).
+| Параметр | Значение |
+|---|---|
+| Name / Artifact | `web-service` |
+| Group | `dev.portfolio` |
+| Language / Java | Java / 21 |
+| Build | Maven |
+| Packaging | Jar |
+| Spring Boot | Стабильная версия линии **3.5.x**, одинаковая в обоих сервисах |
+| Dependencies | Spring Web, Spring Boot Starter Test |
 
-## 2. Соберите Maven-проект в IntelliJ IDEA Ultimate
+Не используй Snapshot/Milestone. Код этого руководства ориентирован на Spring Boot 3.5.x и Spring Framework 6.2.x; если сознательно выбираешь Spring Boot 4.x, проверяй изменения модулей и starter-зависимостей по официальной документации.
 
-1. В IDEA откройте **File → New → Project → Spring Boot**. Укажите `web-workshop`, Language **Java**, Type **Maven**, Packaging **Jar**, JDK и Java **21**, Group `ru.example`, Package `ru.example.workshop`. Выберите стабильный Spring Boot **4.1.2** и зависимость **Spring Web**. Если в IDE нет мастера, сгенерируйте проект с такими же настройками на [Spring Initializr](https://start.spring.io/), распакуйте и откройте его корневой `pom.xml` как проект.
-2. Генератор нужен для получения `mvnw`, `mvnw.cmd` и каталога `.mvn`. Удалите только созданный мастером корневой `src` в этом новом пустом проекте. Вместо него создайте каталоги `repository-service` и `web-service`. В корне и каждом из них создайте POM из примеров ниже.
-3. Откройте окно **Maven**, нажмите **Reload All Maven Projects**. В **File → Project Structure → Project SDK** выберите Java 21. В **Settings → Build, Execution, Deployment → Build Tools → Maven** выберите **Use Maven wrapper**. Убедитесь, что IDE видит оба модуля. Если IDEA предлагает загрузить Maven-проект после изменения POM, согласитесь.
-4. Для классов используйте **New → Package** внутри соответствующего `src/main/java` и **New → Java Class**. Если каталог не отмечен как исходный, сначала перезагрузите Maven после создания структуры. Пути и `package` должны совпадать.
-5. В корне запустите `chmod +x mvnw` и `./mvnw -v`. Проверьте строку Java version. Wrapper скачивает Maven при первом запуске. POM описывает зависимости и сборку, а корневой POM с `packaging=pom` управляет сборкой двух модулей, но сам сервером не является.
+### Шаг 77. Изучи файлы Maven
 
-<!-- file:pom.xml -->
-~~~xml
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.2</version>
-    <relativePath/>
-  </parent>
-  <groupId>ru.example</groupId>
-  <artifactId>web-workshop</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>pom</packaging>
-  <properties><java.version>21</java.version></properties>
-  <modules>
-    <module>repository-service</module>
-    <module>web-service</module>
-  </modules>
-</project>
-~~~
+```text
+web-service/
+├── pom.xml                      # зависимости и сборка
+├── mvnw                         # Maven Wrapper для Linux
+├── mvnw.cmd                     # Wrapper для Windows
+├── .mvn/wrapper/                # конфигурация Wrapper
+└── src/
+    ├── main/java/              # Java-классы
+    ├── main/resources/         # настройки и статические файлы
+    └── test/                   # тесты
+```
 
-<!-- file:repository-service/pom.xml -->
-~~~xml
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>ru.example</groupId>
-    <artifactId>web-workshop</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-  </parent>
-  <artifactId>repository-service</artifactId>
-  <dependencies>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-flyway</artifactId></dependency>
-    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
-    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
-  </dependencies>
-  <build>
-    <finalName>app</finalName>
-    <plugins>
-      <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
-    </plugins>
-  </build>
-</project>
-~~~
+`pom.xml` указывает зависимости и параметры сборки. Wrapper фиксирует версию Maven для команды и IDE.
 
-<!-- file:web-service/pom.xml -->
-~~~xml
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>ru.example</groupId>
-    <artifactId>web-workshop</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-  </parent>
-  <artifactId>web-service</artifactId>
-  <dependencies>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
-  </dependencies>
-  <build>
-    <finalName>app</finalName>
-    <plugins>
-      <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
-    </plugins>
-  </build>
-</project>
-~~~
+### Шаг 78. Проверь Wrapper отдельно от импорта IDEA
 
-Подробнее в документации — [первый Spring-проект в IDEA](https://www.jetbrains.com/help/idea/your-first-spring-application.html), [настройки Maven в IDEA](https://www.jetbrains.com/help/idea/maven-support.html), [Maven Wrapper](https://maven.apache.org/wrapper/), [многомодульная сборка](https://maven.apache.org/guides/mini/guide-multiple-modules.html), [системные требования Spring Boot](https://docs.spring.io/spring-boot/4.1/system-requirements.html).
+```bash
+cd web-service
+chmod +x mvnw
+./mvnw -v
+./mvnw validate
+```
 
-<a id="database"></a>
+В IDEA открой **Settings → Build, Execution, Deployment → Build Tools → Maven → Maven home path** и выбери Maven Wrapper. Если при переключении появляется `No implementation for ArtifactHandlerManager was bound`, сначала проверь `./mvnw validate` в терминале. При исправной командной сборке и ошибке только в IDEA обнови IDE либо временно используй Bundled Maven 3. Не добавляй Guice в `pom.xml` ради такой ошибки. [Maven Wrapper](https://maven.apache.org/tools/wrapper/), [Maven in IntelliJ](https://www.jetbrains.com/help/idea/maven-support.html).
 
-## 3. Запустите PostgreSQL в Docker
+### Шаги 79–82. Запусти пустой Spring Boot
 
-В корне проекта создайте `compose.yaml`. Пока в нём только база. Позже вы добавите сервисы в тот же файл и проверите итоговую конфигурацию.
+79. Найди сгенерированный класс `WebServiceApplication`.
+80. Запусти его зелёной кнопкой у метода `main()`.
+81. В окне **Run** убедись, что сервер стартовал без исключений.
+82. Открой `http://localhost:8080`. До добавления страницы/контроллера ответ 404 нормален.
 
-<!-- file:compose.yaml -->
-~~~yaml
+### Шаг 83. Первый HTTP-контроллер
+
+В `src/main/java/dev/portfolio/web/HelloController.java`:
+
+```java
+package dev.portfolio.web;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController {
+    @GetMapping("/api/hello")
+    public String hello() {
+        return "Hello from Spring Boot!";
+    }
+}
+```
+
+Перезапусти приложение и открой `http://localhost:8080/api/hello`.
+
+**Разберись:** `@RestController` помечает обработчик HTTP-запросов, `@GetMapping` связывает URL и Java-метод. [Spring MVC controllers](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html).
+
+### Шаг 84. Возвращай JSON
+
+Создай `Profile.java`:
+
+```java
+package dev.portfolio.web;
+
+public record Profile(String name, String role) {}
+```
+
+Добавь метод в `HelloController`:
+
+```java
+@GetMapping("/api/profile")
+public Profile profile() {
+    return new Profile("Твоё имя", "Java Developer");
+}
+```
+
+Результат `http://localhost:8080/api/profile`:
+
+```json
+{
+  "name": "Твоё имя",
+  "role": "Java Developer"
+}
+```
+
+Spring Boot автоматически преобразует объект в JSON через настроенный механизм сериализации.
+
+### Шаг 85. Перенеси HTML, CSS и JS в Spring Boot
+
+Скопируй **содержимое** `frontend/`, а не вложенную папку, в:
+
+```text
+web-service/src/main/resources/static/
+├── index.html
+├── catalog.html
+├── board.html
+├── upload.html
+├── gallery.html
+├── ui.html
+├── unity.html
+└── assets/
+```
+
+Далее редактируй одну рабочую копию в `static/`. Предыдущую версию можно восстановить из Git. Spring Boot умеет раздавать эту директорию без дополнительных контроллеров. [Spring Boot static content](https://docs.spring.io/spring-boot/3.5/reference/web/servlet.html).
+
+### Шаг 86. Настрой порт web-service
+
+`web-service/src/main/resources/application.yaml`:
+
+```yaml
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: 8080
+```
+
+`SERVER_ADDRESS` — переменная окружения; если не задана, используется `127.0.0.1`. Локально это безопасный адрес, а в Docker позднее установим `0.0.0.0`.
+
+### Шаг 87. Первый `fetch()` из браузера в Java
+
+В `assets/js/main.js`:
+
+```javascript
+async function loadProfile() {
+    const response = await fetch('/api/profile');
+    if (!response.ok) throw new Error('Не удалось получить профиль');
+    const profile = await response.json();
+    console.log(profile);
+}
+loadProfile().catch(console.error);
+```
+
+Запусти `web-service`, открой `http://localhost:8080`, найди результат в **Browser DevTools → Console**. Запрос больше не идёт к файлу: он вызывает Java-контроллер.
+
+### Шаги 88–91. Заверши первый backend
+
+88. Выведи имя и роль на главной странице через `textContent`.
+89. Добавь состояния «Загрузка...» и «Ошибка загрузки профиля».
+90. Напиши тест `/api/profile` с Spring Boot Test + MockMvc.
+91. Выполни `./mvnw test` и `./mvnw package`; найди JAR в `target/`.
+
+**Контрольная точка №8:** сайт открывается с `localhost:8080`; часть содержимого приходит из Java-контроллера. PostgreSQL всё ещё нет.
+
+---
+
+# Часть III. Два сервиса, но ещё без PostgreSQL (шаги 92–108)
+
+## Этап 10. Независимый `repository-service`
+
+### Шаг 92. Создай второе приложение
+
+Через Spring Initializr в корне `portfolio-lab` создай `repository-service` со следующими параметрами:
+
+- Group `dev.portfolio`, Java 21, Maven, Jar.
+- Та же версия Spring Boot 3.5.x, что у `web-service`.
+- Зависимость **Spring Web**.
+- **Пока без PostgreSQL Driver, JDBC, JPA, Flyway**.
+
+Это самостоятельное приложение с отдельным `pom.xml`, Wrapper и классом `RepositoryServiceApplication`.
+
+### Шаг 93. Настрой внутренний HTTP-порт
+
+`repository-service/src/main/resources/application.yaml`:
+
+```yaml
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: 8082
+```
+
+### Шаг 94. Начни с данных в памяти Java
+
+Создай `ProductController.java` в `dev.portfolio.repository`:
+
+```java
+package dev.portfolio.repository;
+
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/internal/products")
+public class ProductController {
+    public record Product(long id, String name, String category) {}
+
+    @GetMapping
+    public List<Product> getProducts() {
+        return List.of(
+            new Product(1, "Монитор 27", "Мониторы"),
+            new Product(2, "Клавиатура RGB", "Клавиатуры"),
+            new Product(3, "Игровая мышь", "Мыши")
+        );
+    }
+}
+```
+
+Сейчас сервис отвечает за данные, но не умеет хранить изменения. Это нормально на учебном этапе.
+
+### Шаг 95. Проверь API напрямую
+
+Запусти `RepositoryServiceApplication`. Открой:
+
+```text
+http://127.0.0.1:8082/internal/products
+```
+
+Должен прийти JSON с тремя товарами. Оба Spring Boot-приложения работают как отдельные процессы.
+
+### Шаг 96. Подключи web-service к repository-service
+
+В **существующий** `web-service/src/main/resources/application.yaml` добавь:
+
+```yaml
+repository:
+  base-url: ${REPOSITORY_URL:http://127.0.0.1:8082}
+```
+
+Создай `ProductsApiController.java`:
+
+```java
+package dev.portfolio.web;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClient;
+
+@RestController
+public class ProductsApiController {
+    private final RestClient repositoryClient;
+
+    public ProductsApiController(RestClient.Builder builder,
+                                 @Value("${repository.base-url}") String baseUrl) {
+        this.repositoryClient = builder.baseUrl(baseUrl).build();
+    }
+
+    public record Product(long id, String name, String category) {}
+
+    @GetMapping("/api/products")
+    public Product[] getProducts() {
+        return repositoryClient.get()
+            .uri("/internal/products")
+            .retrieve()
+            .body(Product[].class);
+    }
+}
+```
+
+`RestClient` — HTTP-клиент для связи между приложениями. На более позднем этапе вынеси вызовы во внутренний `RepositoryClient`, чтобы контроллер не содержал сетевую логику. [Spring: RestClient](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html#rest-restclient).
+
+### Шаг 97. Проверь цепочку двух сервисов
+
+Запусти **оба** приложения в IDEA и открой:
+
+```text
+http://127.0.0.1:8080/api/products
+```
+
+Тот же JSON теперь проходит по цепочке: браузер → `web-service` → `repository-service` → ответ.
+
+### Шаг 98. Проверь отказ второго сервиса
+
+Останови только `repository-service`, затем снова вызови `/api/products`. Запрос завершится ошибкой связи: так ты увидишь реальное последствие распределённой архитектуры. Запусти сервис обратно.
+
+### Шаг 99. Обработай ошибки связи
+
+Создай обработчик исключений через `@RestControllerAdvice`, чтобы `web-service` отдавал понятный HTTP `503 Service Unavailable` и JSON с сообщением «Каталог временно недоступен». Позже добавь таймауты HTTP-вызовов и логирование.
+
+### Шаги 100–103. Перенеси каталог с JS-массива в Java
+
+100. В `catalog.js` вместо `products = Array.from(...)` начни получать данные через `fetch('/api/products')`.
+101. В `repository-service` создай 12 000 Java-объектов при старте приложения.
+102. Реализуй на сервере фильтрацию и порционную выдачу с параметрами `page`, `size`, `q`.
+103. В `web-service` передавай те же параметры в `repository-service`.
+
+Пример внешнего запроса:
+
+```http
+GET /api/products?page=0&size=24&q=монитор
+```
+
+Нумерация в API начинается **с нуля**, а пользователь видит страницу **1**. Ответ удобно оформить как DTO:
+
+```json
+{
+  "items": [
+    { "id": 1, "name": "Монитор 27", "category": "Мониторы" }
+  ],
+  "page": 0,
+  "size": 24,
+  "total": 3000
+}
+```
+
+Сделай отдельный Java-record `ProductPage` для этого формата и в обоих сервисах согласуй контракт. **Не передавай все 12 000 товаров браузеру**, когда он просит только одну страницу.
+
+### Шаги 104–108. Остальные функции каталога
+
+104. Реализуй `/internal/suggestions?q=мон` — максимум 5 подсказок.
+105. Добавь соответствующий внешний `/api/suggestions`.
+106. Реализуй `/internal/categories/counts`.
+107. Подключи серверные счётчики категорий к HTML.
+108. Переключи бесконечную ленту на тот же серверный endpoint пагинации, увеличивая `page`.
+
+**Контрольная точка №9:** каталог и счётчики работают через **два независимых сервиса**, но в проекте всё ещё нет базы данных. Понятно, зачем нужен HTTP, какие данные передавать в JSON и что произойдёт при падении одного сервиса.
+
+---
+
+# Часть IV. PostgreSQL, миграции, SQL и сохранение данных (шаги 109–155)
+
+## Почему PostgreSQL появляется только теперь
+
+Хранение списка в памяти было достаточным для чтения. Теперь нужны реальные изменения: создание товаров и задач, общий список между устройствами, сохранение после перезапуска, SQL-поиск и агрегаты. Для этих требований памяти одного Java-процесса недостаточно.
+
+## Этап 11–12. Запусти PostgreSQL отдельно через Docker
+
+### Шаг 109. Установи Docker на Arch Linux
+
+```bash
+sudo pacman -S --needed docker docker-compose
+sudo systemctl enable --now docker
+sudo docker version
+sudo docker compose version
+```
+
+Для обучения можно вызывать Docker через `sudo`. Добавление пользователя в группу `docker` необязательно и даёт права, практически равные root. [ArchWiki: Docker](https://wiki.archlinux.org/title/Docker).
+
+### Шаг 110. Создай `compose.yaml` в корне проекта
+
+```yaml
 services:
   db:
-    image: postgres:17
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: portfolio
       POSTGRES_USER: portfolio
@@ -169,1438 +1004,819 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio"]
-      interval: 3s
+      interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 10
 
 volumes:
   pgdata:
-~~~
+```
 
-~~~bash
-docker compose up -d --wait db
-docker compose ps
-docker compose exec db psql -U portfolio -d portfolio -c 'select current_database();'
-~~~
+`5432` — порт внутри контейнера; `5433` — порт для Java и IDEA на твоём компьютере. `pgdata` — именованный Docker volume: данные сохраняются при пересоздании контейнера. `portfolio_dev` допустим только для локального обучения.
 
-В IDEA откройте **View → Tool Windows → Database → + → Data Source → PostgreSQL**. Host `127.0.0.1`, Port `5433`, Database и User `portfolio`, Password `portfolio_dev`. Если IDEA предложит скачать JDBC-драйвер, нажмите **Download missing driver files**, затем **Test Connection → OK**. В SQL Console выполните `select current_database(), version();`.
+### Шаг 111. Запусти только БД
 
-Здесь Docker-образ — шаблон PostgreSQL, контейнер — запущенный экземпляр, том — долговременные данные. `5433:5432` означает «порт компьютера → порт контейнера». Из соседнего контейнера обращаются к `db:5432`, а не к `localhost:5433`. Пароль в примере предназначен только для локального стенда. Изменение переменной `POSTGRES_PASSWORD` не меняет пароль уже созданной роли в существующем томе.
+Из корня проекта:
 
-Подробнее в документации — [образ PostgreSQL](https://hub.docker.com/_/postgres), [зависимости и готовность в Compose](https://docs.docker.com/compose/how-tos/startup-order/), [PostgreSQL в IDEA](https://www.jetbrains.com/help/idea/postgresql.html), [Docker Compose в IDEA](https://www.jetbrains.com/help/idea/docker-compose.html).
+```bash
+sudo docker compose up -d db
+sudo docker compose ps
+sudo docker compose exec db psql -U portfolio -d portfolio
+```
 
-## 4. Сделайте отдельный repository-service
+В SQL-консоли:
 
-Создайте Spring Boot-точку входа, конфигурацию и миграции. `@SpringBootApplication` запускает приложение и поиск компонентов в своём пакете. `JdbcClient` выполняет параметризованный SQL. Вы увидите запросы и планы PostgreSQL напрямую, без ORM и скрытой генерации запросов.
+```sql
+select version();
+```
 
-<!-- file:repository-service/src/main/java/ru/example/workshop/repository/RepositoryApplication.java -->
-~~~java
-package ru.example.workshop.repository;
+Выход — `\q`.
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+### Шаг 112. Подключи базу в IntelliJ IDEA Ultimate
 
-@SpringBootApplication
-public class RepositoryApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(RepositoryApplication.class, args);
-    }
-}
-~~~
+**View → Tool Windows → Database → + → Data Source → PostgreSQL**. Укажи:
 
-<!-- file:repository-service/src/main/resources/application.yaml -->
-~~~yaml
+| Поле | Значение |
+|---|---|
+| Host | `127.0.0.1` |
+| Port | `5433` |
+| Database | `portfolio` |
+| User | `portfolio` |
+| Password | `portfolio_dev` |
+
+Нажми **Test Connection**, скачай драйвер при запросе IDE. 
+
+**Контрольная точка №10:** БД доступна по `127.0.0.1:5433`, IntelliJ может выполнять запросы. [Docker Compose](https://docs.docker.com/compose/gettingstarted/), [JetBrains: Database Tools](https://www.jetbrains.com/help/idea/database-tool-window.html).
+
+## Этап 13. JDBC + Flyway в repository-service
+
+### Шаг 113. Добавь зависимости в `repository-service/pom.xml`
+
+В **существующий** блок `<dependencies>`:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>org.flywaydb</groupId>
+    <artifactId>flyway-core</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.flywaydb</groupId>
+    <artifactId>flyway-database-postgresql</artifactId>
+</dependency>
+```
+
+**JDBC** позволяет посылать SQL-запросы из Java. **Flyway** следит за версионированием схемы. Сначала используем явный SQL, чтобы разобраться, что делает база; Hibernate/JPA добавляй уже после изучения JDBC.
+
+### Шаг 114. Настрой подключение в `repository-service`
+
+`repository-service/src/main/resources/application.yaml`:
+
+```yaml
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: 8082
+
 spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5433/portfolio}
     username: ${DB_USER:portfolio}
     password: ${DB_PASSWORD:portfolio_dev}
-~~~
+```
 
-В `V1` создайте таблицы и индексы, в `V2` добавьте воспроизводимые демонстрационные данные. Flyway применит новые миграции при запуске. Уже применённые файлы не редактируйте после проверки, новые изменения записывайте в следующую миграцию. Так база любого участника будет приводиться к одной схеме.
+Это тот самый `application.yaml`, про который ты спрашивал ранее: Spring Boot автоматически читает его при запуске. Выражение `${DB_USER:portfolio}` означает «взять переменную `DB_USER`, иначе использовать `portfolio`».
 
-<!-- file:repository-service/src/main/resources/db/migration/V1__schema.sql -->
-~~~sql
-create extension if not exists pg_trgm;
+### Шаг 115. Создай SQL-файлы миграций
 
+```text
+repository-service/src/main/resources/
+├── application.yaml
+└── db/
+    └── migration/
+        ├── V1__schema.sql
+        └── V2__demo_data.sql
+```
+
+`V1` и `V2` — **части имён файлов**, это два отдельных `.sql`-файла. После `V1` и `V2` используются **два подчёркивания**. Flyway выполнит их по возрастанию версии.
+
+### Шаг 116. Создай структуру таблиц
+
+`V1__schema.sql`:
+
+```sql
 create table category (
     id bigint generated always as identity primary key,
-    name text not null unique
+    name varchar(100) not null unique
 );
 
 create table product (
     id bigint generated always as identity primary key,
-    name text not null,
-    category_id bigint not null references category(id)
+    category_id bigint not null references category(id),
+    name varchar(200) not null
 );
 
-create index product_category_id_idx on product (category_id, id);
-create index product_name_trgm_idx on product using gin (name gin_trgm_ops);
+create index product_category_idx on product (category_id);
+```
 
+Сначала **без** `pg_trgm`: обычные таблицы, ключи и индекс по категории. Так проще проверить, что сам JDBC и Flyway работают.
+
+### Шаг 117. Заполни базу тестовыми данными
+
+`V2__demo_data.sql`:
+
+```sql
+insert into category (name) values
+    ('Мониторы'),
+    ('Клавиатуры'),
+    ('Мыши'),
+    ('Ноутбуки');
+
+insert into product (category_id, name)
+select c.id, c.name || ' модель ' || g.n
+from generate_series(1, 12000) as g(n)
+join category c on c.name = case (g.n % 4)
+    when 0 then 'Мониторы'
+    when 1 then 'Клавиатуры'
+    when 2 then 'Мыши'
+    else 'Ноутбуки'
+end;
+```
+
+`generate_series` создаёт числовые значения прямо в PostgreSQL, что удобно для тестового каталога.
+
+### Шаг 118. Перезапусти repository-service
+
+Flyway должен автоматически выполнить `V1` и `V2`. В IDEA Database Console:
+
+```sql
+select count(*) from product;
+```
+
+Ожидаемый результат — `12000`.
+
+**Внимание:** этот пример рассчитан на **новую пустую учебную БД**. Если `V1` и `V2` уже применялись, не переписывай их: Flyway хранит контрольные суммы миграций. Новые изменения вноси через `V3`, `V4` и далее. Не удаляй том с ценными данными ради повторного запуска примеров.
+
+### Шаги 119–121. Научись читать SQL
+
+119. Выполни `SELECT` с `WHERE`, `ORDER BY`, `LIMIT` и `OFFSET`.
+120. Выполни `JOIN` между `product` и `category`.
+121. Выполни `GROUP BY`, чтобы подсчитать товары по категориям:
+
+```sql
+select c.name, count(p.id) as total
+from category c
+left join product p on p.category_id = c.id
+group by c.id, c.name
+order by c.name;
+```
+
+**Контрольная точка №11:** 12 000 строк появились посредством Flyway; SQL-запросы работают в IDE. [Flyway](https://documentation.red-gate.com/fd), [PostgreSQL Tutorial](https://www.postgresql.org/docs/current/tutorial.html).
+
+## Этап 14. Заменяем Java-списки запросами к PostgreSQL
+
+### Шаг 122. Создай класс репозитория
+
+`repository-service/src/main/java/dev/portfolio/repository/repository/ProductRepository.java`:
+
+```java
+package dev.portfolio.repository.repository;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class ProductRepository {
+    private final JdbcClient jdbc;
+
+    public ProductRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public long countAll() {
+        return jdbc.sql("select count(*) from product")
+                .query(Long.class)
+                .single();
+    }
+}
+```
+
+Аннотация `@Repository` — обозначение Java-компонента, работающего с данными; **не путай её** с именем отдельного приложения `repository-service`. [Spring JdbcClient](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html#jdbc-JdbcClient).
+
+### Шаг 123. Напиши SQL для одной страницы
+
+```sql
+select p.id, p.name, c.name as category
+from product p
+join category c on c.id = p.category_id
+where p.name ilike '%' || :query || '%'
+order by p.id
+limit :size offset :offset;
+```
+
+`:query`, `:size`, `:offset` здесь — **именованные параметры JdbcClient**, которые Java передаёт безопасно. В SQL-консоли IDEA их потребуется подставить значениями. Не вставляй пользовательский текст непосредственно в SQL-строку конкатенацией Java.
+
+| Шаг | Задача |
+|---:|---|
+| 124 | Добавь метод `findPage(query, page, size)` |
+| 125 | Ограничь страницу, например максимум 100 объектов; валидируй `page >= 0` |
+| 126 | Создай `ProductService`, использующий `ProductRepository` |
+| 127 | В `ProductController` замени список в памяти вызовом сервиса |
+| 128 | Проверь `/internal/products` напрямую |
+| 129 | Проверь `/api/products` через web-service |
+
+Важно возвращать **и страницу, и общее число совпадений**. `COUNT(*)` для общего числа и SQL с `LIMIT/OFFSET` для текущих элементов — два разных запроса.
+
+### Шаг 130. Перенеси счётчики в SQL
+
+Создай метод SQL-агрегации по категориям на основе запроса из шага 121. Явно различай *количество всех товаров* и *количество подходящих под текущий поиск*.
+
+### Шаг 131. Перенеси подсказки в SQL
+
+```sql
+select name
+from product
+where name ilike '%' || :query || '%'
+order by name
+limit 5;
+```
+
+В браузере используй debounce и `AbortController`: если пользователь уже ввёл новый запрос, старый ответ не должен перезаписать новые подсказки.
+
+### Шаг 132. Исследуй план запроса
+
+В IntelliJ Database Console:
+
+```sql
+explain (analyze, buffers)
+select * from product where name ilike '%монитор%';
+```
+
+Запомни время, тип сканирования и количество прочитанных страниц.
+
+### Шаг 133. Подключи `pg_trgm` только теперь
+
+Создай **новую** миграцию `V3__product_search_index.sql`:
+
+```sql
+create extension if not exists pg_trgm;
+
+create index product_name_trgm_idx
+    on product using gin (name gin_trgm_ops);
+```
+
+`pg_trgm` — расширение PostgreSQL для операций по тройкам символов, полезное для поиска по части строки. `gin_trgm_ops` — индексный класс операторов, **не имя столбца**. Правильно: `(name gin_trgm_ops)`, без запятой; неверно: `(name, gin_trgm_ops)` и `gin_tgrm_ops`.
+
+Если IDEA подчёркивает `gin_trgm_ops`, но миграция успешно выполняется, проверь диалект PostgreSQL и синхронизацию Data Source. Само подчёркивание не доказывает ошибку в SQL. Сравни `EXPLAIN ANALYZE` до и после. На маленьких таблицах PostgreSQL не обязан использовать индекс. [PostgreSQL: pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html).
+
+**Контрольная точка №12:** каталог работает через PostgreSQL, результаты подсчитываются и сортируются в SQL, поиск можно исследовать через план выполнения.
+
+## Этап 15. Сохраняем Kanban в PostgreSQL
+
+| Шаг | Задача |
+|---:|---|
+| 134 | Создай миграцию `V4__board.sql` |
+| 135 | Создай таблицу `task(id, title, status, position)` |
+| 136 | Добавь несколько демонстрационных задач |
+| 137 | Создай `TaskRepository` с методом получения задач |
+| 138 | Создай `TaskService` |
+| 139 | Добавь `GET /internal/tasks` в repository-service |
+| 140 | Добавь `GET /api/tasks` в web-service |
+| 141 | Замени чтение `localStorage` на `fetch('/api/tasks')` |
+| 142 | Создай `POST` для добавления задачи |
+| 143 | Создай `DELETE` для удаления задачи |
+| 144 | Добавь `PUT`/`PATCH` для изменения статуса и позиции |
+| 145 | Сохраняй перестановку карточек в транзакции `@Transactional` |
+
+Пример `V4__board.sql` для начального варианта:
+
+```sql
 create table task (
     id bigint generated always as identity primary key,
-    title text not null,
-    lane text not null check (lane in ('todo', 'done')),
-    position integer not null check (position >= 0)
+    title varchar(250) not null,
+    status varchar(30) not null,
+    position integer not null,
+    constraint task_status_check
+        check (status in ('TODO', 'IN_PROGRESS', 'DONE'))
 );
-~~~
 
-<!-- file:repository-service/src/main/resources/db/migration/V2__demo_data.sql -->
-~~~sql
-insert into category(name) values ('Мониторы'), ('Клавиатуры'), ('Мыши'), ('Аудио'), ('Пока пусто');
+create index task_status_position_idx on task(status, position);
+```
 
-insert into product(name, category_id)
-select (array['Монитор', 'Клавиатура', 'Мышь', 'Наушники'])[1 + (n - 1) % 4]
-       || ' Demo ' || lpad(n::text, 5, '0'),
-       1 + (n - 1) % 4
-from generate_series(1, 50000) as s(n);
+Один перенос может менять позиции нескольких карточек — сохраняй эти изменения атомарно в одной транзакции. Проверяй корректность входящих данных и защищай mutating API перед публичной публикацией (авторизация, CSRF/токены в зависимости от схемы аутентификации).
 
-insert into task(title, lane, position) values
-    ('Собрать главную страницу', 'todo', 0),
-    ('Сделать демо каталога', 'todo', 1),
-    ('Настроить Docker', 'done', 0);
+## Этап 16. Загрузка файлов на сервер
 
-analyze product;
-~~~
+| Шаг | Задача |
+|---:|---|
+| 146 | Создай `FormData` в `upload.js` |
+| 147 | Добавь выбранные файлы в запрос |
+| 148 | Отправь `POST /api/files` с помощью `fetch()` |
+| 149 | В web-service принимай файлы через `MultipartFile` |
+| 150 | Настрой ограничение загрузки, например 10 МБ |
+| 151 | Передай файл из web-service в repository-service |
+| 152 | Сохраняй файл вне `src/main/resources`, в выделенной папке |
+| 153 | Создай таблицу метаданных: ID, имя, размер, тип, дата, путь |
+| 154 | Добавь endpoint списка загруженных файлов |
+| 155 | Реализуй удаление файла и метаданных |
 
-Ниже один контроллер для учебного стенда. Он принимает HTTP-запросы и выполняет небольшой объём SQL. После первого запуска полезно вынести запросы в `@Repository`, а сохранение доски — в `@Service` с `@Transactional`. Оба класса останутся **внутри отдельного repository-service**.
+Пример браузерного запроса:
 
-<!-- file:repository-service/src/main/java/ru/example/workshop/repository/DataApi.java -->
-~~~java
-package ru.example.workshop.repository;
+```javascript
+const form = new FormData();
+form.append('file', selectedFile);
+const response = await fetch('/api/files', {
+    method: 'POST',
+    body: form
+});
+if (!response.ok) throw new Error('Ошибка загрузки');
+```
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+Не устанавливай вручную `Content-Type` для `FormData`: браузер сам сформирует `multipart/form-data` с boundary.
 
-@RestController
-@RequestMapping("/internal")
-public class DataApi {
-    private final JdbcClient db;
-    public DataApi(JdbcClient db) { this.db = db; }
+Для Spring Boot в `web-service/src/main/resources/application.yaml` можно добавить:
 
-    public record Product(long id, String name, long categoryId) {}
-    public record Page(List<Product> items, int page, int size, long total) {}
-    public record Feed(List<Product> items, Long nextAfter) {}
-    public record Category(long id, String name, long count) {}
-    public record Task(long id, String title, String lane, int position) {}
-    public record Order(List<Long> todo, List<Long> done) {}
-
-    private static final String PRODUCT =
-        "select id, name, category_id as \"categoryId\" from product";
-
-    @GetMapping("/products")
-    Page products(@RequestParam(name="page", defaultValue="0") int page,
-                  @RequestParam(name="size", defaultValue="20") int size,
-                  @RequestParam(name="categoryId", required=false) Long categoryId,
-                  @RequestParam(name="q", defaultValue="") String q) {
-        q = q.strip();
-        if (q.length() > 80 || (!q.isEmpty() && q.length() < 3)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        if (page < 0 || size < 1 || size > 100 || (categoryId != null && categoryId < 1)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        var clauses = new ArrayList<String>();
-        if (categoryId != null) clauses.add("category_id = :category");
-        if (!q.isEmpty()) clauses.add("name ilike :pattern escape '!'");
-        String where = clauses.isEmpty() ? "" : " where " + String.join(" and ", clauses);
-        var rows = db.sql(PRODUCT + where + " order by id limit :size offset :offset")
-            .param("size", size).param("offset", (long) page * size);
-        var count = db.sql("select count(*) from product" + where);
-        if (categoryId != null) {
-            rows.param("category", categoryId);
-            count.param("category", categoryId);
-        }
-        if (!q.isEmpty()) {
-            rows.param("pattern", pattern(q));
-            count.param("pattern", pattern(q));
-        }
-        return new Page(rows.query(Product.class).list(), page, size,
-            count.query(Long.class).single());
-    }
-
-    @GetMapping("/products/{id}")
-    Product product(@PathVariable("id") long id) {
-        return db.sql(PRODUCT + " where id = :id").param("id", id).query(Product.class)
-            .optional().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-    }
-
-    @GetMapping("/feed")
-    Feed feed(@RequestParam(name="after", defaultValue="0") long after) {
-        if (after < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        int limit = 20;
-        var rows = db.sql(PRODUCT + " where id > :after order by id limit :limit")
-            .param("after", after).param("limit", limit + 1).query(Product.class).list();
-        var items = rows.subList(0, Math.min(limit, rows.size()));
-        return new Feed(items, rows.size() > limit ? items.getLast().id() : null);
-    }
-
-    @GetMapping("/suggestions")
-    List<Product> suggest(@RequestParam("q") String q) {
-        q = q.strip();
-        if (q.length() < 3) return List.of();
-        if (q.length() > 80) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        return db.sql(PRODUCT + " where name ilike :pattern escape '!' order by id limit 8")
-            .param("pattern", pattern(q)).query(Product.class).list();
-    }
-
-    private static String pattern(String value) {
-        return "%" + value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
-    }
-
-    @GetMapping("/categories")
-    List<Category> categories() {
-        return db.sql("""
-            select c.id, c.name, count(p.id) as count
-            from category c left join product p on p.category_id = c.id
-            group by c.id, c.name order by c.id
-            """).query(Category.class).list();
-    }
-
-    @GetMapping("/tasks")
-    List<Task> tasks() {
-        return db.sql("select id, title, lane, position from task order by lane, position, id")
-            .query(Task.class).list();
-    }
-
-    @PutMapping("/tasks/order")
-    @Transactional
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void order(@RequestBody Order order) {
-        if (order.todo() == null || order.done() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        var ids = new HashSet<Long>();
-        ids.addAll(order.todo());
-        ids.addAll(order.done());
-        if (ids.contains(null) || ids.size() != order.todo().size() + order.done().size()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        var stored = db.sql("select id from task order by id for update").query(Long.class).list();
-        if (!ids.equals(new HashSet<>(stored))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT);
-        }
-        saveLane("todo", order.todo());
-        saveLane("done", order.done());
-    }
-
-    private void saveLane(String lane, List<Long> ids) {
-        for (int i = 0; i < ids.size(); i++) {
-            db.sql("update task set lane = :lane, position = :pos where id = :id")
-                .param("lane", lane).param("pos", i).param("id", ids.get(i)).update();
-        }
-    }
-}
-~~~
-
-### Проверьте в IDEA
-
-1. При запущенном `db` откройте `RepositoryApplication.java`. Нажмите зелёную стрелку у `main` → **Run 'RepositoryApplication'**. В **Run → Edit Configurations** переименуйте конфигурацию в `Repository · local`, выставьте JDK 21 и Working directory `$ProjectFileDir$`. Убедитесь, что выбрано classpath модуля `repository-service`. Если пароль/порт отличаются от примера, добавьте `DB_URL` и `DB_PASSWORD` в Environment variables этой конфигурации.
-2. В логах должны быть успешные миграции и запуск сервера на `8082`. В окне Database обновите схему `public` и найдите `product` и `flyway_schema_history`.
-3. Выполните запросы ниже. После этого поставьте breakpoint внутри `products`, перезапустите через **Debug**, повторите запрос и посмотрите параметры в **Debugger**.
-
-~~~bash
-curl -fsS 'http://localhost:8082/internal/products?page=0&size=3'
-curl -fsS 'http://localhost:8082/internal/feed?after=20'
-curl -fsS 'http://localhost:8082/internal/categories'
-curl -fsS -G --data-urlencode 'q=монитор' http://localhost:8082/internal/suggestions
-~~~
-
-**Что проверить в SQL Console.** `select count(*) from product;` должен вернуть **50 000**, а запрос категорий — четыре строки по **12 500** и одну с **0**. Именно `count(p.id)`, а не `count(*)` оставляет ноль для категории без товаров при `LEFT JOIN`. Выполните оба плана и сравните фактическое число строк, чтения и время. Не обещайте конкретный план или скорость — PostgreSQL выбирает их по данным и статистике.
-
-~~~sql
-explain (analyze, buffers)
-select id, name from product order by id limit 20 offset 40000;
-
-explain (analyze, buffers)
-select id, name from product where id > 40000 order by id limit 20;
-
-explain (analyze, buffers)
-select id from product where name ilike '%монитор%' limit 8;
-~~~
-
-`ORDER BY id` задаёт уникальный порядок обоим способам пагинации. Номера страниц удобны для перехода напрямую, но большой `OFFSET` требует пропустить строки. Для ленты используем курсор `after`. Бэкенд запрашивает 21 строку, возвращает 20 и вычисляет наличие следующей порции. Точный `COUNT` выполняется по запросу каталога и не нужен ленте. Если каталог станет большим, измерьте задержку подсчёта до выбора кэша или предварительной агрегации. `pg_trgm` может ускорять `ILIKE` с вхождением в середине строки, но индекс не гарантирует конкретный план.
-
-Подробнее в документации — [Flyway в Spring Boot](https://docs.spring.io/spring-boot/how-to/data-initialization.html), [JdbcClient в Spring Framework](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html), [LIMIT и OFFSET](https://www.postgresql.org/docs/17/queries-limit.html), [pg_trgm](https://www.postgresql.org/docs/17/pgtrgm.html), [EXPLAIN](https://www.postgresql.org/docs/17/using-explain.html).
-
-
-<a id="resume"></a>
-
-## 5. Сделайте web-service и главную страницу резюме
-
-Веб-сервис не добавляет зависимость от модуля `repository-service`, JDBC или драйвера PostgreSQL. Его контракт с соседним сервисом — только HTTP. `RestClient` используем с ограничением времени подключения и чтения. Если сервис данных недоступен, браузер получает `502`, а главная страница резюме продолжает открываться.
-
-<!-- file:web-service/src/main/java/ru/example/workshop/web/WebApplication.java -->
-~~~java
-package ru.example.workshop.web;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class WebApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(WebApplication.class, args);
-    }
-}
-~~~
-
-<!-- file:web-service/src/main/resources/application.yaml -->
-~~~yaml
-server:
-  address: ${SERVER_ADDRESS:127.0.0.1}
-  port: 8080
+```yaml
 spring:
   servlet:
     multipart:
       max-file-size: 10MB
-      max-request-size: 11MB
-workshop:
-  repository-base-url: ${REPOSITORY_BASE_URL:http://127.0.0.1:8082}
-  upload-dir: ${UPLOAD_DIR:./uploads}
-~~~
+      max-request-size: 10MB
+```
 
-<!-- file:web-service/src/main/java/ru/example/workshop/web/PublicApi.java -->
-~~~java
-package ru.example.workshop.web;
+Файлы храни под сгенерированным безопасным именем, например UUID, не используй напрямую путь или имя, присланные пользователем. Проверяй ограничения **на сервере**, а не только в JS. Метаданные храни в PostgreSQL, сами файлы — в выделенном хранилище, которое позднее получит Docker volume. [Spring: Uploading Files](https://spring.io/guides/gs/uploading-files).
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.time.Duration;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.*;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriBuilder;
+**Контрольная точка №13:** задачи и файлы сохраняются после перезапуска сервисов, а каталог и поиск работают через PostgreSQL. 
 
-@RestController
-@RequestMapping("/api")
-public class PublicApi {
-    private final RestClient repository;
+---
+# Часть V. Docker для приложений (шаги 156–166)
 
-    public PublicApi(@Value("${workshop.repository-base-url}") String baseUrl) {
-        var http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-        var factory = new JdkClientHttpRequestFactory(http);
-        factory.setReadTimeout(Duration.ofSeconds(3));
-        repository = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
-    }
+## Этап 17. Собираем JAR и создаём Dockerfile
 
-    @GetMapping("/products")
-    ResponseEntity<byte[]> products(@RequestParam(name="page", defaultValue="0") int page,
-                                    @RequestParam(name="size", defaultValue="20") int size,
-                                    @RequestParam(name="categoryId", required=false) Long categoryId,
-                                    @RequestParam(name="q", defaultValue="") String q) {
-        if (q.length() > 80) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        return get(uri -> {
-            uri.path("/internal/products").queryParam("page", page).queryParam("size", size);
-            if (categoryId != null) uri.queryParam("categoryId", categoryId);
-            if (!q.isBlank()) return uri.queryParam("q", "{q}").build(q);
-            return uri.build();
-        });
-    }
+### Шаг 156. Собери `web-service`
 
-    @GetMapping("/products/{id}")
-    ResponseEntity<byte[]> product(@PathVariable("id") long id) {
-        return get(u -> u.path("/internal/products/{id}").build(id));
-    }
+Из корня проекта:
 
-    @GetMapping("/feed")
-    ResponseEntity<byte[]> feed(@RequestParam(name="after", defaultValue="0") long after) {
-        return get(u -> u.path("/internal/feed").queryParam("after", after).build());
-    }
+```bash
+cd web-service
+./mvnw clean package
+```
 
-    @GetMapping("/suggestions")
-    ResponseEntity<byte[]> suggestions(@RequestParam("q") String q) {
-        if (q.length() > 80) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        return get(u -> u.path("/internal/suggestions").queryParam("q", "{q}").build(q));
-    }
+Проверь, что в `target/` появился исполняемый JAR.
 
-    @GetMapping("/categories")
-    ResponseEntity<byte[]> categories() { return get(u -> u.path("/internal/categories").build()); }
+### Шаг 157. Собери `repository-service`
 
-    @GetMapping("/tasks")
-    ResponseEntity<byte[]> tasks() { return get(u -> u.path("/internal/tasks").build()); }
+```bash
+cd ../repository-service
+./mvnw clean package
+```
 
-    @PutMapping(path="/tasks/order", consumes=MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<byte[]> order(@RequestBody byte[] body) {
-        return forward(() -> repository.put().uri("/internal/tasks/order")
-            .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().toEntity(byte[].class));
-    }
+Ожидай `BUILD SUCCESS`. Для начала собираем JAR **на хост-машине**, а контейнер будет только запускать его; позже можно изучить multi-stage builds.
 
-    private ResponseEntity<byte[]> get(Function<UriBuilder, URI> uri) {
-        return forward(() -> repository.get().uri(uri).retrieve().toEntity(byte[].class));
-    }
+### Шаг 158. Создай `web-service/Dockerfile`
 
-    private ResponseEntity<byte[]> forward(Supplier<ResponseEntity<byte[]>> call) {
-        try {
-            var answer = call.get();
-            if (answer.getStatusCode().value() == 204) return ResponseEntity.noContent().build();
-            return ResponseEntity.status(answer.getStatusCode())
-                .contentType(MediaType.APPLICATION_JSON).body(answer.getBody());
-        } catch (RestClientResponseException ex) {
-            if (ex.getStatusCode().is4xxClientError()) {
-                throw new ResponseStatusException(ex.getStatusCode());
-            }
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ошибка сервиса данных", ex);
-        } catch (RestClientException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Сервис данных недоступен", ex);
-        }
-    }
-}
-~~~
-
-В `web-service/src/main/resources/static/` создайте `index.html` и `site.css`. Здесь `{Имя Фамилия}` и другие поля — примеры. Замените их своими данными перед публикацией. Раздел «Опыт» можно назвать «Проекты», если коммерческого опыта пока нет. Для каждого проекта укажите задачу, свою роль, использованное решение и то, что посетитель может открыть или проверить. Не добавляйте уровни владения навыками в процентах.
-
-<!-- file:web-service/src/main/resources/static/index.html -->
-~~~html
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Имя Фамилия — портфолио разработчика</title>
-  <meta name="description" content="Резюме и демонстрации Java, Spring Boot, SQL и веб-интерфейсов">
-  <link rel="stylesheet" href="/site.css">
-</head>
-<body><main>
-  <nav aria-label="Разделы резюме">
-    <a href="#about">Обо мне</a>
-    <a href="#skills">Навыки и демо</a>
-    <a href="#projects">Проекты</a>
-    <a href="#contact">Контакты</a>
-  </nav>
-  <header class="hero">
-    <p class="eyebrow">Портфолио разработчика</p>
-    <h1>{Имя Фамилия}</h1>
-    <p>{Желаемая роль} · {Город или формат работы}</p>
-    <p>{В двух предложениях: что умею и какие задачи хочу решать.}</p>
-    <a class="cta" href="#skills">Посмотреть демо</a>
-  </header>
-  <section id="about">
-    <h2>Обо мне</h2>
-    <p>{Образование, профильный опыт и задачи, которые мне интересны.}</p>
-  </section>
-  <section id="skills">
-    <h2>Навыки и демо</h2>
-    <div class="grid">
-      <article><h3>Java, Spring, PostgreSQL</h3><p>SQL-поиск, пагинация и точные счётчики.</p>
-        <a href="/catalog.html">Каталог</a> · <a href="/catalog.html#search-form">Поиск</a> ·
-        <a href="/feed.html">Лента</a> ·
-        <a href="/categories.html">Категории</a></article>
-      <article><h3>Интерактивный JavaScript</h3><p>Сохранение порядка и отправка файлов.</p>
-        <a href="/board.html">Доска</a> · <a href="/upload.html">Загрузка</a></article>
-      <article><h3>HTML и CSS</h3><p>Карусель, диалог, селектор, движение.</p>
-        <a href="/gallery.html">Галерея</a> · <a href="/ui.html#modal">Модальное окно</a> ·
-        <a href="/ui.html#dropdown">Селектор</a> · <a href="/ui.html#animations">Анимации</a></article>
-      <article><h3>Unity Web и Docker</h3><p>Сборка Brotli через Nginx.</p>
-        <a href="/unity/">Запустить Unity</a></article>
-    </div>
-  </section>
-  <section id="projects">
-    <h2>Избранные проекты</h2>
-    <article>
-      <h3>Этот сайт-портфолио</h3>
-      <p>Собрал два Spring Boot-сервиса с Maven, PostgreSQL и Docker Compose.
-        Сравнил пагинацию по номеру и курсору на 50 000 сгенерированных товаров.</p>
-      <p>{Ссылка на исходники и короткое описание ещё одного проекта.}</p>
-    </article>
-  </section>
-  <section id="contact">
-    <h2>Контакты</h2>
-    <p>{Рабочая почта} · {GitHub} · {При желании — резюме в PDF}</p>
-  </section>
-</main></body>
-</html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/site.css -->
-~~~css
-:root {
-  color-scheme: light;
-  font-family: system-ui, sans-serif;
-  line-height: 1.55;
-  color: #17182a;
-  background: #f6f6fb;
-  --accent: #4d32ad;
-}
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-body { margin: 0; }
-main { max-width: 64rem; margin: auto; padding: 2rem min(5vw, 3rem) 4rem; }
-nav { display: flex; flex-wrap: wrap; gap: .9rem; align-items: center; }
-section { margin-block: 2.5rem; }
-.hero {
-  margin-top: 1.5rem; padding: min(6vw, 3rem);
-  background: #eae2ff; border-radius: 1.4rem;
-}
-h1 { font-size: clamp(2rem, 6vw, 4rem); line-height: 1.05; margin: .3em 0; }
-h2, h3 { line-height: 1.25; }
-.eyebrow { letter-spacing: .08em; text-transform: uppercase; font-size: .83rem; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; }
-article, .panel { padding: 1rem; background: #fff; border: 1px solid #d8d4e7; border-radius: .9rem; }
-article h3 { margin-top: 0; }
-a { color: var(--accent); text-underline-offset: .15em; }
-button, input { font: inherit; }
-button, .cta {
-  background: var(--accent); color: #fff; border: 1px solid transparent;
-  border-radius: .55rem; padding: .4rem .7rem; cursor: pointer;
-  transition: background-color .2s, transform .2s;
-}
-.cta { display: inline-block; }
-button:disabled { opacity: .55; cursor: default; }
-button:not(:disabled):hover, .cta:hover { background: #321b82; transform: translateY(-1px); }
-:focus-visible { outline: 3px solid #007a71; outline-offset: 3px; }
-input[type="search"] { max-width: 100%; padding: .4rem .55rem; }
-.row { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
-.dropzone { border: 2px dashed #716a86; border-radius: .9rem; padding: 1rem; }
-.dropzone.active { background: #eae2ff; border-color: var(--accent); }
-.lane { min-height: 5rem; padding: .8rem 1rem .8rem 2.2rem; margin: .5rem 0; border: 1px dashed #716a86; }
-.task { margin-bottom: .65rem; padding: .5rem; background: #f4f0ff; }
-.task .row { margin-top: .4rem; }
-.track {
-  position: relative; display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
-  border-radius: .9rem; background: #fff;
-}
-.track figure { flex: 0 0 100%; margin: 0; scroll-snap-align: start; }
-.track img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
-.track figcaption { padding: .7rem; }
-dialog { max-width: min(30rem, 90vw); border: 0; border-radius: .9rem; padding: 1.4rem; }
-dialog::backdrop { background: rgb(17 15 30 / 55%); }
-.demo-menu { position: relative; width: fit-content; }
-.demo-menu summary { cursor: pointer; }
-.demo-menu button[aria-pressed="true"] { background: #23655d; }
-.pulse { animation: pop .45s ease-out; }
-@keyframes pop { 50% { transform: scale(1.12); background: #23655d; } }
-@media (prefers-reduced-motion: reduce) {
-  button, .cta { transition: none; }
-  button:not(:disabled):hover, .cta:hover { transform: none; }
-  .pulse { animation: none; }
-}
-~~~
-
-В IDEA запустите `WebApplication` из gutter, как раньше `RepositoryApplication`. В **Run → Edit Configurations** назовите конфигурацию `Web · local` и выставьте Working directory `$ProjectFileDir$`, чтобы загруженные файлы попадали в корень проекта. Откройте `http://localhost:8080/`. Без IDE эти два приложения можно запустить из двух терминалов в корне проекта командами `./mvnw -pl repository-service spring-boot:run` и `./mvnw -pl web-service spring-boot:run`. В **Services** можно следить за Docker, в **Run** — за отдельными логами Java-сервисов. На Linux комбинации клавиш могут перехватываться оконным менеджером, поэтому главное — названия действий.
-
-~~~bash
-curl -fsS 'http://localhost:8080/api/products?page=0&size=3'
-curl -fsS -G --data-urlencode 'q=монитор' http://localhost:8080/api/suggestions
-~~~
-
-Остановите только `Repository · local` и повторите запрос `curl -i http://localhost:8080/api/categories`. Ожидается `502`, при этом `/` остаётся доступным. Затем снова запустите сервис данных. Это хороший момент поставить два breakpoint: в `PublicApi.products` и `DataApi.products`. Один запрос из браузера остановится в двух разных JVM. Возобновите выполнение первого процесса, чтобы запрос дошёл до второго. Из-за таймаута в 3 секунды медленный пошаговый debug может вернуть `502`. Для длительного эксперимента временно увеличьте таймаут и верните его после отладки.
-
-Подробнее в документации — [клиенты REST в Spring Framework](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html), [Spring MVC](https://docs.spring.io/spring-framework/reference/web/webmvc.html), [статические ресурсы Spring Boot](https://docs.spring.io/spring-boot/reference/web/servlet.html), [отладка в IntelliJ IDEA](https://www.jetbrains.com/help/idea/debugging-code.html).
-
-<a id="demos"></a>
-
-## 6. Сделайте каталог, поиск, прокрутку и счётчики
-
-Внутри `static` создайте четыре HTML-страницы и два JS-файла. Общий модуль `common.js` проверяет HTTP-статус. При отображении текста из API используйте `textContent`, а не присваивание `innerHTML`.
-
-<!-- file:web-service/src/main/resources/static/common.js -->
-~~~js
-export async function json(url, options) {
-  const response = await fetch(url, options);
-  if (!response.ok) throw new Error("HTTP " + response.status);
-  return response.status === 204 ? null : response.json();
-}
-
-export function addText(list, text) {
-  const li = document.createElement("li");
-  li.textContent = text;
-  list.append(li);
-}
-~~~
-
-<!-- file:web-service/src/main/resources/static/catalog.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Каталог — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<nav><a href="/">← Резюме</a><a href="/categories.html">Категории</a></nav>
-<h1>Каталог</h1>
-<form id="search-form" class="row">
-  <label for="search">Название товара</label>
-  <input id="search" type="search" maxlength="80" autocomplete="off"
-         placeholder="Например, монитор" aria-describedby="search-status">
-  <button>Найти</button>
-</form>
-<p id="search-status" role="status">Введите не менее трёх символов.</p>
-<ul id="suggestions"></ul>
-<div class="row">
-  <button id="prev" disabled>Назад</button>
-  <button id="next" disabled>Вперёд</button>
-  <form id="jump">
-    <label for="page">Страница</label>
-    <input id="page" type="number" min="1" required value="1">
-    <button>Перейти</button>
-  </form>
-</div>
-<p id="status" role="status"></p><ol id="items"></ol>
-<script type="module" src="/browse.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/feed.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Лента — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<nav><a href="/">← Резюме</a><a href="/catalog.html">Каталог</a></nav>
-<h1>Бесконечная лента</h1>
-<p>Прокрутите вниз или нажмите кнопку. Сервер отдаёт по 20 записей.</p>
-<ol id="feed-items"></ol>
-<p id="feed-status" role="status"></p><button id="more">Загрузить ещё</button>
-<div id="sentinel" aria-hidden="true" style="height: 1px"></div>
-<script type="module" src="/browse.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/categories.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Категории — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<nav><a href="/">← Резюме</a><a href="/catalog.html">Каталог</a></nav>
-<h1>Количество товаров</h1>
-<p>PostgreSQL считает товары по категориям. В каталоге 50 000 учебных записей.</p>
-<ul id="categories"></ul><p id="category-status" role="status"></p>
-<script type="module" src="/browse.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/product.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Товар — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<nav><a href="/">← Резюме</a><a href="/catalog.html">Каталог</a></nav>
-<h1 id="product-name">Учебный товар</h1><p id="product-status" role="status">Загрузка…</p>
-<script type="module" src="/browse.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/browse.js -->
-~~~js
-import { json, addText } from "./common.js";
-const $ = (id) => document.getElementById(id);
-const pretty = new Intl.NumberFormat("ru");
-
-if ($("items")) {
-  const params = new URLSearchParams(location.search);
-  let page = 0;
-  let pages = 0;
-  let loading = false;
-  const start = Math.max(0, Number(params.get("page") || 1) - 1);
-  const prev = $("prev"), next = $("next"), input = $("page"), status = $("status");
-
-  async function loadPage(requested) {
-    if (loading || !Number.isSafeInteger(requested) || requested < 0 || requested > 2147483647) return;
-    loading = prev.disabled = next.disabled = true;
-    status.textContent = "Загрузка…";
-    try {
-      const q = new URLSearchParams({ page: requested, size: 20 });
-      if (params.has("categoryId")) q.set("categoryId", params.get("categoryId"));
-      if (params.has("q")) q.set("q", params.get("q"));
-      const data = await json("/api/products?" + q);
-      page = data.page;
-      pages = Math.ceil(data.total / data.size);
-      if (page >= Math.max(1, pages)) {
-        loading = false;
-        return await loadPage(Math.max(0, pages - 1));
-      }
-      const list = $("items");
-      list.replaceChildren();
-      list.start = page * data.size + 1;
-      for (const item of data.items) addText(list, item.name + " · #" + item.id);
-      input.value = page + 1;
-      input.max = Math.max(1, pages);
-      params.set("page", page + 1);
-      history.replaceState(null, "", "?" + params);
-      status.textContent = pages ? "Страница " + (page + 1) + " из " + pages +
-        " · товаров " + pretty.format(data.total) : "По этим условиям товаров нет.";
-    } catch (error) {
-      status.textContent = "Не удалось загрузить страницу. Повторите запрос. " + error.message;
-    } finally {
-      loading = false;
-      prev.disabled = page <= 0;
-      next.disabled = page + 1 >= pages;
-    }
-  }
-
-  prev.onclick = () => void loadPage(page - 1);
-  next.onclick = () => void loadPage(page + 1);
-  $("jump").onsubmit = (e) => { e.preventDefault(); void loadPage(Number(input.value) - 1); };
-  void loadPage(Number.isSafeInteger(start) && start <= 2147483647 ? start : 0);
-
-  const search = $("search"), suggestions = $("suggestions"), searchStatus = $("search-status");
-  let timer, pending;
-  search.value = params.get("q") ?? "";
-  $("search-form").onsubmit = (e) => {
-    e.preventDefault();
-    if (loading) return;
-    const value = search.value.trim();
-    if (value.length > 0 && value.length < 3) {
-      searchStatus.textContent = "Введите не менее трёх символов.";
-      return;
-    }
-    clearTimeout(timer);
-    pending?.abort();
-    suggestions.replaceChildren();
-    searchStatus.textContent = value ? "Поиск: " + value : "Фильтр по названию сброшен.";
-    if (value) params.set("q", value);
-    else params.delete("q");
-    void loadPage(0);
-  };
-  search.addEventListener("input", () => {
-    clearTimeout(timer);
-    pending?.abort();
-    suggestions.replaceChildren();
-    const value = search.value.trim();
-    if (value.length < 3) {
-      searchStatus.textContent = "Введите не менее трёх символов.";
-      return;
-    }
-    searchStatus.textContent = "Ищем…";
-    timer = setTimeout(async () => {
-      const request = new AbortController();
-      pending = request;
-      try {
-        const rows = await json("/api/suggestions?" + new URLSearchParams({ q: value }),
-          { signal: request.signal });
-        if (request.signal.aborted) return;
-        for (const item of rows) {
-          const li = document.createElement("li"), link = document.createElement("a");
-          link.textContent = item.name + " · #" + item.id;
-          link.href = "/product.html?id=" + item.id;
-          li.append(link);
-          suggestions.append(li);
-        }
-        searchStatus.textContent = rows.length ? "Подсказок: " + rows.length : "Совпадений нет.";
-      } catch (error) {
-        if (error.name !== "AbortError") searchStatus.textContent = "Ошибка поиска. " + error.message;
-      }
-    }, 250);
-  });
-}
-
-if ($("product-name")) {
-  const id = new URLSearchParams(location.search).get("id");
-  const status = $("product-status");
-  if (!id || !/^\d+$/.test(id)) {
-    status.textContent = "Некорректный ID товара.";
-  } else {
-    json("/api/products/" + id).then((item) => {
-      $("product-name").textContent = item.name;
-      status.textContent = "Номер в учебном каталоге: " + item.id;
-    }).catch((error) => { status.textContent = "Не удалось открыть товар. " + error.message; });
-  }
-}
-
-if ($("feed-items")) {
-  const target = $("sentinel"), button = $("more"), status = $("feed-status");
-  let after = 0, busy = false, ended = false;
-
-  async function loadMore() {
-    if (busy || ended) return;
-    busy = button.disabled = true;
-    observer.unobserve(target);
-    let succeeded = false;
-    status.textContent = "Загрузка…";
-    try {
-      const data = await json("/api/feed?after=" + after);
-      for (const item of data.items) addText($("feed-items"), item.name + " · #" + item.id);
-      ended = data.nextAfter === null;
-      after = data.nextAfter;
-      succeeded = true;
-      status.textContent = ended ? "Все товары загружены." : "Добавлено: " + data.items.length;
-    } catch (error) {
-      status.textContent = "Не загрузилось. Нажмите «Загрузить ещё». " + error.message;
-    } finally {
-      busy = false;
-      button.disabled = ended;
-      if (succeeded && !ended) observer.observe(target);
-    }
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) void loadMore();
-  }, { rootMargin: "0px 0px 120px 0px" });
-  button.onclick = () => void loadMore();
-  void loadMore();
-}
-
-if ($("categories")) {
-  json("/api/categories").then((rows) => {
-    for (const row of rows) {
-      const li = document.createElement("li"), link = document.createElement("a");
-      link.href = "/catalog.html?categoryId=" + row.id;
-      link.textContent = row.name + " — " + pretty.format(row.count);
-      li.append(link);
-      $("categories").append(li);
-    }
-  }).catch((error) => { $("category-status").textContent = "Не удалось получить счётчики. " + error.message; });
-}
-~~~
-
-**Как это работает.** Каталог использует номера страниц с единицы в интерфейсе и с нуля в API. Прямой переход принимает номер, а URL сохраняет выбранную страницу. Подсказки появляются после 250 мс без ввода. `AbortController` отменяет устаревший запрос со стороны браузера, чтобы его ответ не затёр новые результаты. Подсказки — обычные ссылки, доступны по Tab и ведут на страницу конкретного товара по ID. Enter или кнопка «Найти» применяют поиск ко всему каталогу, включая точное число результатов. Пустой поиск снимает фильтр.
-
-В ленте `IntersectionObserver` наблюдает за элементом внизу списка. Один запрос за раз исключает повторы, а после сетевой ошибки остаётся ручная кнопка. При тысячах элементов, одновременно оставленных в DOM, страница может замедлиться. Для следующей версии измерьте это в Performance и при необходимости добавьте виртуализацию.
-
-**Проверка.** Откройте `/catalog.html?page=2`. Перейдите на последнюю страницу, затем попробуйте пустую категорию. В DevTools → Network включите медленную сеть, быстро введите «монитор», затем «клавиатура» и проверьте, что отображается только последний ответ. В ленте сравните последние ID порций: они должны расти. В `/categories.html` проверьте пять категорий и сумму 50 000.
-
-Подробнее в документации — [Fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch), [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController), [Intersection Observer](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API).
-
-
-## 7. Реализуйте перетаскивание карточек и сохранение порядка
-
-В `/board.html` будут колонки «Сделать» и «Готово». Для мыши используем браузерные `dragstart`, `dragover` и `drop`. Для клавиатуры и телефона оставляем видимые кнопки «Выше», «Ниже» и «В другую колонку». Нативный HTML Drag and Drop не стоит считать надёжным способом взаимодействия на всех сенсорных устройствах.
-
-Схема сохранения проста: браузер отправляет две упорядоченные последовательности ID, сервис данных проверяет, что каждый ID встречается ровно один раз и состав карточек совпадает с базой, затем меняет позиции в транзакции. При ошибке браузер возвращает прежний порядок. Одновременные правки двух вкладок одной доски по-прежнему могут перезаписать друг друга. Если захотите полноценно поддержать совместную работу, добавьте версию доски и отклоняйте изменения устаревшей версии с `409`.
-
-<!-- file:web-service/src/main/resources/static/board.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Доска — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<a href="/">← Резюме</a><h1>Доска задач</h1>
-<p>Перетащите карточку на другую карточку, чтобы вставить перед ней,
-  или на свободное место колонки, чтобы добавить в конец.</p>
-<p id="board-status" role="status"></p>
-<div id="board" class="grid">
-  <article><h2>Сделать</h2><ol class="lane" data-lane="todo"></ol></article>
-  <article><h2>Готово</h2><ol class="lane" data-lane="done"></ol></article>
-</div>
-<script type="module" src="/board.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/board.js -->
-~~~js
-import { json } from "./common.js";
-const board = document.querySelector("#board"), status = document.querySelector("#board-status");
-const lanes = ["todo", "done"];
-let tasks = { todo: [], done: [] };
-let saving = false;
-
-function paint(focusId, focusAction) {
-  for (const lane of lanes) {
-    const list = board.querySelector('[data-lane="' + lane + '"]');
-    list.replaceChildren();
-    for (const [i, task] of tasks[lane].entries()) {
-      const card = document.createElement("li"), controls = document.createElement("div");
-      card.className = "task";
-      card.dataset.id = task.id;
-      card.draggable = !saving;
-      card.tabIndex = -1;
-      card.append(document.createTextNode(task.title));
-      controls.className = "row";
-      const actions = [
-        ["up", "Выше", i === 0, () => move(task.id, lane, tasks[lane][i - 1].id, "up")],
-        ["down", "Ниже", i === tasks[lane].length - 1, () => move(task.id, lane, tasks[lane][i + 2]?.id, "down")],
-        ["other", "В другую колонку", false, () => move(task.id, lane === "todo" ? "done" : "todo", undefined, "other")]
-      ];
-      let focusButton;
-      for (const [key, title, disabled, action] of actions) {
-        const button = document.createElement("button");
-        button.textContent = title;
-        button.setAttribute("aria-label", task.title + ": " + title);
-        button.disabled = saving || disabled;
-        button.onclick = action;
-        if (key === focusAction && !button.disabled) focusButton = button;
-        controls.append(button);
-      }
-      card.append(controls);
-      list.append(card);
-      if (task.id === focusId) (focusButton ?? card).focus({ preventScroll: true });
-    }
-  }
-}
-
-async function move(id, lane, before, action) {
-  if (saving || id === before || !lanes.includes(lane)) return;
-  const from = lanes.find((key) => tasks[key].some((card) => card.id === id));
-  if (!from) return;
-  const original = structuredClone(tasks);
-  const index = tasks[from].findIndex((card) => card.id === id);
-  const [card] = tasks[from].splice(index, 1);
-  const found = tasks[lane].findIndex((item) => item.id === before);
-  tasks[lane].splice(found < 0 ? tasks[lane].length : found, 0, card);
-  saving = true;
-  paint(id);
-  try {
-    await json("/api/tasks/order", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ todo: tasks.todo.map(t => t.id), done: tasks.done.map(t => t.id) })
-    });
-    status.textContent = "Порядок сохранён.";
-  } catch (error) {
-    tasks = original;
-    status.textContent = "Не удалось сохранить. Порядок на экране восстановлен. " + error.message;
-  } finally {
-    saving = false;
-    paint(id, action);
-  }
-}
-
-board.addEventListener("dragstart", (e) => {
-  const card = e.target.closest("[data-id]");
-  if (!card || saving) return;
-  e.dataTransfer.setData("text/plain", card.dataset.id);
-  e.dataTransfer.effectAllowed = "move";
-});
-board.addEventListener("dragover", (e) => {
-  if (!saving && e.target.closest("[data-lane]")) e.preventDefault();
-});
-board.addEventListener("drop", (e) => {
-  const list = e.target.closest("[data-lane]");
-  if (!list) return;
-  e.preventDefault();
-  const id = Number(e.dataTransfer.getData("text/plain"));
-  const target = e.target.closest("[data-id]");
-  void move(id, list.dataset.lane, target ? Number(target.dataset.id) : undefined);
-});
-
-json("/api/tasks").then((rows) => {
-  for (const row of rows) tasks[row.lane].push(row);
-  paint();
-}).catch((error) => { status.textContent = "Доска не загрузилась. " + error.message; });
-~~~
-
-**Проверка.** Перенесите карточку перед другой, в другую колонку и в пустую колонку. Обновите страницу. Убедитесь, что порядок сохранён. Повторите действие с клавиатуры. В Database Console выполните `select * from task order by lane, position;`. Остановите сервис данных и попытайтесь переставить карточку: интерфейс должен показать ошибку и вернуть предыдущий порядок.
-
-Подробнее в документации — [HTML Drag and Drop API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API), [декларативные транзакции Spring](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative.html).
-
-## 8. Добавьте загрузку файлов
-
-В отличие от доски, здесь перетаскиваются файлы из операционной системы. JS берёт их из `DataTransfer.files` при `drop` или из `input.files` при выборе. Каждый файл отправляется отдельно в `multipart/form-data` с полем `file`. Браузер сам задаёт `Content-Type` с границей частей, вручную этот заголовок не ставьте.
-
-Spring ограничивает размер 10 МиБ на файл. Сервер не использует исходное имя для записи, сохраняет файл под UUID вне `static` и не раздаёт его по URL. Готовый файл перемещается из временного после копирования. Это демо приёма файлов, а не публичное файловое хранилище.
-
-<!-- file:web-service/src/main/java/ru/example/workshop/web/UploadApi.java -->
-~~~java
-package ru.example.workshop.web;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
-
-@RestController
-public class UploadApi {
-    private final Path root;
-    public UploadApi(@Value("${workshop.upload-dir}") String directory) {
-        root = Path.of(directory).toAbsolutePath().normalize();
-    }
-
-    public record Uploaded(String id, long size) {}
-
-    @PostMapping(path="/api/files", consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    Uploaded upload(@RequestParam("file") MultipartFile file) throws IOException {
-        if (file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        Files.createDirectories(root);
-        String id = UUID.randomUUID().toString();
-        Path temp = Files.createTempFile(root, ".upload-", ".part");
-        try {
-            try (var input = file.getInputStream()) {
-                Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING);
-            }
-            Files.move(temp, root.resolve(id), StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(temp);
-        }
-        return new Uploaded(id, file.getSize());
-    }
-}
-~~~
-
-<!-- file:web-service/src/main/resources/static/upload.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Загрузка — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<a href="/">← Резюме</a><h1>Загрузка файлов</h1>
-<div id="drop" class="dropzone">
-  <p>Перетащите файлы сюда. Максимум 10 МиБ на файл.</p>
-  <label for="files">Или выберите файлы:</label> <input id="files" type="file" multiple>
-</div>
-<p id="upload-status" role="status"></p><ul id="results"></ul>
-<script type="module" src="/upload.js"></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/upload.js -->
-~~~js
-import { json, addText } from "./common.js";
-const zone = document.querySelector("#drop"), input = document.querySelector("#files");
-const status = document.querySelector("#upload-status"), results = document.querySelector("#results");
-let busy = false;
-
-async function upload(files) {
-  if (busy || !files.length) return;
-  busy = input.disabled = true;
-  try {
-    for (const file of files) {
-      status.textContent = "Обрабатываем: " + file.name;
-      if (file.size === 0 || file.size > 10 * 1024 * 1024) {
-        addText(results, file.name + " — недопустимый размер");
-        continue;
-      }
-      const body = new FormData();
-      body.append("file", file);
-      try {
-        const result = await json("/api/files", { method: "POST", body });
-        addText(results, file.name + " — принят, ID " + result.id);
-      } catch (error) {
-        addText(results, file.name + " — ошибка: " + error.message);
-      }
-    }
-    status.textContent = "Готово. Результаты ниже.";
-  } finally {
-    busy = input.disabled = false;
-    input.value = "";
-  }
-}
-
-zone.addEventListener("dragover", (e) => {
-  if (!e.dataTransfer.types.includes("Files")) return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect = busy ? "none" : "copy";
-  if (!busy) zone.classList.add("active");
-});
-zone.addEventListener("dragleave", (e) => {
-  if (!zone.contains(e.relatedTarget)) zone.classList.remove("active");
-});
-zone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  zone.classList.remove("active");
-  void upload([...e.dataTransfer.files]);
-});
-input.addEventListener("change", () => void upload([...input.files]));
-~~~
-
-**Проверка.** Перетащите небольшой тестовый файл, затем отправьте его через выбор файлов. Посмотрите, что в `./uploads` появились две записи под разными UUID. Этот же запрос можно воспроизвести из терминала:
-
-~~~bash
-printf 'test upload\n' > /tmp/portfolio-test.txt
-curl -i -F 'file=@/tmp/portfolio-test.txt' http://localhost:8080/api/files
-~~~
-
-Отдельно проверьте файл больше лимита через `curl`, обходя проверку браузера. Для теста удобно взять файл 10,5 МиБ: он проходит транспортный лимит Nginx, но должен получить `413` от Spring. Исключите `/uploads/` из Git. Если позже захотите разрешить скачивание или предпросмотр, сначала определите допустимые форматы и проверку содержимого. Не выкладывайте присланные посетителями файлы прямо в `static`.
-
-Подробнее в документации — [File drag and drop](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop), [FormData](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest_API/Using_FormData_Objects), [гайд Spring по загрузке файлов](https://spring.io/guides/gs/uploading-files).
-
-## 9. Сделайте галерею и страницу компонентов
-
-Для галереи поместите три собственных изображения `01.jpg`, `02.jpg` и `03.jpg` в `web-service/src/main/resources/static/photos/`. Измените подписи и `alt` так, чтобы они описывали именно ваши фотографии или скриншоты. CSS Scroll Snap ставит слайд на границу после прокрутки. Кнопки управляют тем же скроллом, поэтому работают и с клавиатуры. Не запускайте автоматическую смену слайдов.
-
-<!-- file:web-service/src/main/resources/static/gallery.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Галерея — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<a href="/">← Резюме</a><h1>Галерея проектов</h1>
-<div class="row">
-  <button id="previous">Предыдущий</button><button id="following">Следующий</button>
-</div>
-<div id="track" class="track" role="region" tabindex="0" aria-label="Фотографии проектов">
-  <figure><img src="/photos/01.jpg" alt="Замените на описание первого кадра"><figcaption>Кадр 1</figcaption></figure>
-  <figure><img src="/photos/02.jpg" alt="Замените на описание второго кадра"><figcaption>Кадр 2</figcaption></figure>
-  <figure><img src="/photos/03.jpg" alt="Замените на описание третьего кадра"><figcaption>Кадр 3</figcaption></figure>
-</div>
-<script src="/gallery.js" defer></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/gallery.js -->
-~~~js
-const track = document.querySelector("#track");
-const slides = [...track.querySelectorAll("figure")];
-const back = document.querySelector("#previous"), next = document.querySelector("#following");
-const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-let current = 0;
-
-function setControls() {
-  back.disabled = current === 0;
-  next.disabled = current === slides.length - 1;
-}
-function show(delta) {
-  current = Math.max(0, Math.min(slides.length - 1, current + delta));
-  track.scrollTo({ left: slides[current].offsetLeft, behavior: reduce.matches ? "instant" : "smooth" });
-  setControls();
-}
-back.onclick = () => show(-1);
-next.onclick = () => show(1);
-track.addEventListener("scroll", () => {
-  if (track.clientWidth) current = Math.min(slides.length - 1, Math.round(track.scrollLeft / track.clientWidth));
-  setControls();
-}, { passive: true });
-setControls();
-~~~
-
-Для модального окна используйте `<dialog>` и `showModal()`. Браузер сам блокирует взаимодействие с фоном, закрывает окно по Escape и управляет начальным фокусом. Кастомный селектор здесь — раскрывающийся блок `<details>` со списком кнопок, выбранным состоянием и возвратом фокуса. Это не имитация WAI-ARIA combobox. Если нужен селектор внутри формы, начните с `<select>` или реализуйте и протестируйте полный паттерн APG, включая навигацию стрелками и управление фокусом.
-
-<!-- file:web-service/src/main/resources/static/ui.html -->
-~~~html
-<!doctype html>
-<html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Компоненты — портфолио</title><link rel="stylesheet" href="/site.css">
-</head><body><main>
-<a href="/">← Резюме</a><h1>HTML и CSS</h1>
-<section id="modal" class="panel">
-  <h2>Модальное окно</h2>
-  <button id="open-dialog">Открыть</button>
-  <dialog id="dialog" aria-labelledby="dialog-title">
-    <h2 id="dialog-title">Пример проекта</h2><p>Здесь можно показать детали работы.</p>
-    <form method="dialog"><button autofocus>Закрыть</button></form>
-  </dialog>
-</section>
-<section id="dropdown" class="panel">
-  <h2>Кастомный селектор</h2>
-  <details id="selector" class="demo-menu">
-    <summary id="selection">Тема: Светлая</summary>
-    <div class="row">
-      <button type="button" aria-pressed="true">Светлая</button>
-      <button type="button" aria-pressed="false">Сиреневая</button>
-      <button type="button" aria-pressed="false">Мятная</button>
-    </div>
-  </details>
-</section>
-<section id="animations" class="panel">
-  <h2>CSS-анимации</h2><p>Наведите мышь для плавной смены цвета, нажмите для анимации.</p>
-  <button id="motion">Запустить анимацию</button>
-</section>
-<script src="/ui.js" defer></script>
-</main></body></html>
-~~~
-
-<!-- file:web-service/src/main/resources/static/ui.js -->
-~~~js
-const dialog = document.querySelector("#dialog"), opener = document.querySelector("#open-dialog");
-opener.onclick = () => dialog.showModal();
-dialog.addEventListener("close", () => opener.focus());
-
-const details = document.querySelector("#selector"), summary = document.querySelector("#selection");
-const colors = ["#4d32ad", "#653281", "#23655d"];
-const options = [...details.querySelectorAll("button")];
-options.forEach((button, index) => {
-  button.onclick = () => {
-    for (const item of options) item.setAttribute("aria-pressed", String(item === button));
-    summary.textContent = "Тема: " + button.textContent;
-    document.documentElement.style.setProperty("--accent", colors[index]);
-    details.open = false;
-    summary.focus();
-  };
-});
-details.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && details.open) {
-    e.preventDefault();
-    details.open = false;
-    summary.focus();
-  }
-});
-
-const motion = document.querySelector("#motion");
-motion.onclick = () => {
-  motion.classList.remove("pulse");
-  void motion.offsetWidth; // Применить сброс перед повторным запуском анимации.
-  motion.classList.add("pulse");
-};
-~~~
-
-**Проверка.** Пройдите страницу клавишами Tab, Enter, Space и Escape. Убедитесь, что Tab не попадает на фон открытого диалога, селектор меняет акцент, а фокус возвращается после закрытия. Включите системное уменьшение движения или эмуляцию `prefers-reduced-motion` в DevTools. Кнопки и галерея должны остаться рабочими без анимации.
-
-Подробнее в документации — [элемент dialog](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog), [CSS Scroll Snap](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_scroll_snap), [CSS transitions](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_transitions), [prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion), [ARIA APG для select-only combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/examples/combobox-select-only/).
-
-
-<a id="containers"></a>
-
-## 10. Упакуйте два сервиса и Nginx в Docker Compose
-
-Сначала убедитесь, что IDEA запускает оба сервиса и `./mvnw clean verify` собирает два исполняемых JAR. Рабочие файлы — `repository-service/target/app.jar` и `web-service/target/app.jar`. Они независимы: у каждого свой класс `main` и свой набор зависимостей. Команда `verify` в этом руководстве проверяет сборку, а не заменяет проверку API: автотесты в стартовый проект не включены.
-
-В корне создайте общий многоэтапный `Dockerfile`. Аргумент `SERVICE` определяет, какой модуль собрать. В итоговый образ попадёт только соответствующий JAR и JRE, без Maven и исходников.
-
-<!-- file:Dockerfile -->
-~~~dockerfile
-# syntax=docker/dockerfile:1
-FROM eclipse-temurin:21-jdk AS build
-WORKDIR /src
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-COPY repository-service/ repository-service/
-COPY web-service/ web-service/
-ARG SERVICE
-RUN chmod +x mvnw
-RUN --mount=type=cache,target=/root/.m2,sharing=locked \
-    ./mvnw -B -pl "$SERVICE" -am -DskipTests package && \
-    cp "$SERVICE/target/app.jar" /out.jar
-
+```dockerfile
 FROM eclipse-temurin:21-jre
-WORKDIR /opt/app
-RUN mkdir -p /data/uploads && touch /data/uploads/.keep \
-    && chown -R 10001:10001 /data
-COPY --from=build /out.jar app.jar
-USER 10001:10001
-ENTRYPOINT ["java", "-jar", "app.jar"]
-~~~
+WORKDIR /app
+COPY target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+```
 
-<!-- file:.dockerignore -->
-~~~
-.git
-.idea
-**/target
-uploads
-unity
-.env
-~~~
+- `FROM` — базовая среда Java Runtime.
+- `WORKDIR` — рабочая директория приложения.
+- `COPY` — перенос собранного JAR.
+- `EXPOSE` — документирование внутреннего порта (не публикация наружу).
+- `ENTRYPOINT` — команда запуска.
 
-Теперь **замените** `compose.yaml` полной версией. `db` остался тем же сервисом с тем же томом. Профиль `stack` подключает три дополнительных контейнера. `docker compose up -d --wait db` по-прежнему запускает только базу для IDEA.
+### Шаг 159. Создай `repository-service/Dockerfile`
 
-<!-- file:compose.yaml -->
-~~~yaml
-services:
-  db:
-    image: postgres:17
+```dockerfile
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY target/*.jar app.jar
+EXPOSE 8082
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+```
+
+> Эти Dockerfile предполагают, что в `target/` один подходящий исполняемый JAR. Если там несколько JAR, задай более конкретное имя файла или скопируй нужный артефакт в стандартное место перед сборкой образа.
+
+## Этап 18. Запускаем сервисы с Docker Compose
+
+### Шаг 160. Дополни существующий `compose.yaml`
+
+Внутри `services:` добавь **не вместо** существующего `db`, а рядом с ним:
+
+```yaml
+  repository-service:
+    build: ./repository-service
     environment:
-      POSTGRES_DB: portfolio
-      POSTGRES_USER: portfolio
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portfolio_dev}
-    ports:
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
-
-  repository:
-    profiles: ["stack"]
-    build:
-      context: .
-      args:
-        SERVICE: repository-service
-    environment:
-      SERVER_ADDRESS: "0.0.0.0"
+      SERVER_ADDRESS: 0.0.0.0
       DB_URL: jdbc:postgresql://db:5432/portfolio
       DB_USER: portfolio
       DB_PASSWORD: ${POSTGRES_PASSWORD:-portfolio_dev}
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
 
-  web:
-    profiles: ["stack"]
-    build:
-      context: .
-      args:
-        SERVICE: web-service
+  web-service:
+    build: ./web-service
     environment:
-      SERVER_ADDRESS: "0.0.0.0"
-      REPOSITORY_BASE_URL: http://repository:8082
-      UPLOAD_DIR: /data/uploads
-    volumes:
-      - uploads:/data/uploads
-    depends_on:
-      - repository
-
-  nginx:
-    profiles: ["stack"]
-    image: nginx:stable-alpine
+      SERVER_ADDRESS: 0.0.0.0
+      REPOSITORY_URL: http://repository-service:8082
     ports:
-      - "127.0.0.1:8081:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./unity:/usr/share/nginx/html/unity:ro
+      - "127.0.0.1:8080:8080"
     depends_on:
-      - web
+      - repository-service
+```
 
-volumes:
-  pgdata:
+В существующем блоке верхнего уровня `volumes:` оставь `pgdata:` и добавь:
+
+```yaml
   uploads:
-~~~
+```
 
-Создайте `nginx/default.conf`. Регулярные locations ниже отвечают за уже сжатые файлы. Модуль компрессии Brotli в Nginx не нужен: сервер отдаёт байты, которые заранее сжал Unity. `location /unity/` не должен иметь модификатор `^~`, иначе сработает префикс и Nginx пропустит регулярные правила с заголовками.
+`repository-service` — DNS-имя сервиса внутри сети Compose. `127.0.0.1` внутри контейнера означал бы **сам контейнер**, поэтому приложения соединяются по именам `db` и `repository-service`.
 
-<!-- file:nginx/default.conf -->
-~~~nginx
+Для сохранения файлов настрой `repository-service` так, чтобы использовался путь `/app/uploads` в контейнере. В локальной IDEA можно использовать другую директорию через параметр приложения.
+
+### Шаг 161. Запусти всю систему
+
+Вернись в корень проекта:
+
+```bash
+cd ..
+sudo docker compose up --build -d
+sudo docker compose ps
+sudo docker compose logs -f repository-service
+```
+
+Открой `http://localhost:8080`. Для выхода из просмотра логов используй `Ctrl+C`: контейнеры продолжат работу.
+
+### Шаги 162–166. Проверь жизненный цикл
+
+162. Проверь, что главная страница открывается из контейнера.
+163. Вызови `/api/products`, поиск и счётчики.
+164. Перезапусти только `repository-service`: `sudo docker compose restart repository-service`.
+165. Проверь, что задачи и загруженные файлы сохранились.
+166. Изучи `docker compose ps`, `logs`, `stop`, `start`, `down` и имена сервисов.
+
+**Осторожно:** `docker compose down -v` **удаляет именованные тома** и может уничтожить данные БД. Не выполняй эту команду, если данные нужны. `depends_on` задаёт порядок старта; для готовности приложений добавь healthcheck и обработку временной недоступности.
+
+**Контрольная точка №14:** `web-service`, `repository-service` и PostgreSQL работают раздельно в контейнерах, но доступны как одна система. [Dockerfile](https://docs.docker.com/reference/dockerfile/), [Compose Specification](https://docs.docker.com/reference/compose-file/).
+
+---
+
+# Часть VI. Unity, Brotli и Nginx (шаги 167–180)
+
+## Этап 19. Подготовка Web-сборки Unity
+
+| Шаг | Задача |
+|---:|---|
+| 167 | Создай или открой свой проект в Unity |
+| 168 | Установи модуль **Web Build Support** |
+| 169 | Выбери платформу **Web** в настройках сборки |
+| 170 | В Player/Publishing Settings выбери **Compression Format: Brotli**; настрой отключение Decompression Fallback, если сервер будет выдавать корректные заголовки |
+| 171 | Экспортируй Web-сборку в `portfolio-lab/unity-build/` |
+
+Ожидаемая структура:
+
+```text
+portfolio-lab/
+└── unity-build/
+    ├── index.html
+    ├── Build/
+    └── TemplateData/
+```
+
+Точный состав зависит от версии Unity. Ограничение **100 МБ** проверяется для реального экспортированного проекта — Brotli само по себе не гарантирует нужного размера. При необходимости оптимизируй текстуры, аудио и ресурсы. [Unity Web Deployment](https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/webgl/building-distribution/deploying).
+
+## Этап 20. Создаём Nginx gateway
+
+### Шаг 172. Создай `infra/nginx.conf`
+
+```nginx
 server {
     listen 80;
-    server_name _;
-    absolute_redirect off;
-    root /usr/share/nginx/html;
-    client_max_body_size 12m;
-
-    location = /unity {
-        return 308 /unity/;
-    }
-
-    location ~ ^/unity/.+\.wasm\.br$ {
-        gzip off;
-        types {}
-        default_type application/wasm;
-        add_header Content-Encoding br;
-        try_files $uri =404;
-    }
-
-    location ~ ^/unity/.+\.js\.br$ {
-        gzip off;
-        types {}
-        default_type application/javascript;
-        add_header Content-Encoding br;
-        try_files $uri =404;
-    }
-
-    location ~ ^/unity/.+\.br$ {
-        gzip off;
-        types {}
-        default_type application/octet-stream;
-        add_header Content-Encoding br;
-        try_files $uri =404;
-    }
+    server_name localhost;
 
     location /unity/ {
-        index index.html;
+        root /usr/share/nginx/html;
         try_files $uri $uri/ =404;
     }
 
+    location ~ ^/unity/.*\.wasm\.br$ {
+        root /usr/share/nginx/html;
+        gzip off;
+        default_type application/wasm;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+    }
+
+    location ~ ^/unity/.*\.js\.br$ {
+        root /usr/share/nginx/html;
+        gzip off;
+        default_type application/javascript;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+    }
+
+    location ~ ^/unity/.*\.data\.br$ {
+        root /usr/share/nginx/html;
+        gzip off;
+        default_type application/octet-stream;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+    }
+
+    location ~ ^/unity/.*\.symbols\.json\.br$ {
+        root /usr/share/nginx/html;
+        gzip off;
+        default_type application/octet-stream;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+    }
+
     location / {
-        proxy_pass http://web:8080;
+        proxy_pass http://web-service:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-~~~
+```
 
-Создайте каталог `unity/` в корне, даже если самого экспорта ещё нет, затем проверьте стенд. `nginx/default.conf` нужно сохранить **до** запуска Compose.
+Nginx выдаёт **уже сжатые файлы `.br`** и сообщает браузеру с помощью `Content-Encoding: br`, что ответ закодирован Brotli. `Content-Type` для `.wasm.br` должен быть `application/wasm`, для `.js.br` — JavaScript. Это базовая учебная конфигурация; если Unity экспортирует другие имена или расширения, дополни конфигурацию по фактическим файлам и документации версии Unity.
 
-~~~bash
-mkdir -p unity
-docker compose --profile stack config --quiet
-docker compose --profile stack up -d --build
-docker compose --profile stack ps
-docker compose --profile stack logs --tail=60 repository web nginx
-docker compose --profile stack exec nginx nginx -t
-curl -fsS http://localhost:8081/api/categories
-~~~
+### Шаг 173. Добавь контейнер gateway в `compose.yaml`
 
-Проверьте главную страницу на `http://localhost:8081/`. Если сразу после запуска Nginx возвращает `502`, дождитесь сообщения о старте в логах `web` и `repository`. `depends_on` с проверкой готовности применён к PostgreSQL. Для остальных сервисов он задаёт порядок старта, но не гарантирует, что Java уже принимает запросы. Если после пересоздания только контейнера web ошибка остаётся, перезапустите Nginx командой `docker compose --profile stack restart nginx`, чтобы он заново разрешил имя сервиса.
+В раздел `services:`:
 
-В IDEA можно подключить Docker: **Settings → Build, Execution, Deployment → Docker → +**, выберите соединение с Docker Engine через сокет, проверьте **Connection successful**. В **Services** появятся контейнеры и их логи. Если IDE-конфигурация Compose не передаёт профиль `stack`, используйте приведённую команду в терминале IDEA.
+```yaml
+  gateway:
+    image: nginx:stable-alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./unity-build:/usr/share/nginx/html/unity:ro
+    depends_on:
+      - web-service
+```
 
-Для обычной остановки используйте `docker compose --profile stack down`. Два именованных тома переживут остановку. Команда `down -v` удаляет содержимое обоих томов, поэтому для обычного перезапуска она не нужна. Пересборка образов не очищает данные.
+### Шаг 174. Запусти Nginx
 
-Подробнее в документации — [многоэтапная сборка Docker](https://docs.docker.com/build/building/multi-stage/), [профили Compose](https://docs.docker.com/compose/how-tos/profiles/), [сеть Compose](https://docs.docker.com/compose/how-tos/networking/), [Nginx proxy_pass](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass).
+```bash
+sudo docker compose up --build -d
+```
 
-<a id="unity-web"></a>
+Проверь:
 
-## 11. Экспортируйте Unity Web и проверьте Brotli
+```text
+http://localhost:8088
+http://localhost:8088/unity/index.html
+```
 
-IntelliJ IDEA здесь запускает Java и управляет файлами сайта, но сборку Unity создаёт **Unity Editor**. Если у вас уже есть готовый Web-экспорт, используйте его и начните с копирования. Если редактор на Arch работает нестабильно, проверьте список поддерживаемых ОС для своей версии Unity. Arch не входит в список официально поддерживаемых Linux-дистрибутивов для Unity 6.0. Можно собрать проект на поддерживаемой ОС и перенести в Arch только готовую папку экспорта.
+### Шаг 175. Встрой Unity в резюме
 
-1. Для подходящей версии Unity Editor установите в Unity Hub модуль **Web Build Support**. Название модуля в некоторых версиях может содержать **WebGL**.
-2. В редакторе откройте **File → Build Profiles → Web**, добавьте или активируйте профиль Web и включите нужную сцену в список сцен. Отключите **Development Build** для релизного размера.
-3. В **Edit → Project Settings → Player → Web → Publishing Settings** установите **Compression Format → Brotli** и снимите **Decompression Fallback**. При выключенном fallback браузер получает сжатые файлы с HTTP-заголовками и распаковывает их сам. Пример Nginx рассчитан на обычные файлы `.br`, а не на `.unityweb`.
-4. Для первого проекта оставьте многопоточность Web выключенной. При её включении нужна кросс-оригинная изоляция и отдельная проверка COOP/COEP. Эти настройки не требуются в конфигурации для обычной однопоточной сборки.
-5. Нажмите **Build**, выберите чистую папку экспорта с простым именем, например `WebBuild`, и скопируйте её **содержимое целиком** в пустой `unity/` рядом с `compose.yaml`. В результате нужны `unity/index.html`, `unity/Build/…` и остальные папки, которые действительно создал экспорт, например `TemplateData` или `StreamingAssets`. Не переименовывайте сгенерированные ресурсы вручную: загрузчик уже ссылается на их имена.
-6. Откройте `http://localhost:8081/unity/` через Nginx. Не используйте `file://` и не проверяйте этот путь на прямом порту Spring `8080`. Для размещения сайта вне localhost настройте HTTPS, а потом повторите проверку ответов.
+В `web-service/src/main/resources/static/unity.html` добавь:
 
-Проверьте фактический файл `.wasm.br`. Следующие команды выполняются в корне проекта. При отсутствии файла проверьте выбранный формат сжатия, fallback и правильность пути экспорта.
+```html
+<iframe
+    src="/unity/index.html"
+    title="Unity Web Demo"
+    loading="lazy"
+    style="width: 100%; height: 650px; border: 0">
+</iframe>
+```
 
-~~~bash
-test -f unity/index.html
-find unity/Build -maxdepth 1 -name '*.wasm.br' -print
-wasm_file=$(find unity/Build -maxdepth 1 -name '*.wasm.br' -print -quit)
-if [ -n "$wasm_file" ]; then
-  curl -fsSI -H 'Accept-Encoding: br' \
-    "http://localhost:8081/${wasm_file// /%20}"
-fi
+Путь `/unity/index.html` рассчитан на открытие сайта через Nginx (`:8088`), а не напрямую через `web-service` (`:8080`).
 
-find unity -type f -printf '%s\n' | awk '
-  { bytes += $1; files++ }
-  END {
-    printf "%d файлов, %d байт\n", files, bytes
-    exit (files == 0 || bytes > 100000000)
-  }'
-~~~
+### Шаг 176. Проверь HTTP-заголовки Brotli
 
-Для Wasm ожидайте `200`, `Content-Type: application/wasm` и `Content-Encoding: br`. Для `.js.br` ожидайте JavaScript MIME и `br`, для `.data.br` — `application/octet-stream` и `br`. В браузере откройте DevTools → **Network**, включите **Disable cache**, перезагрузите страницу и проверьте, что сцена запустилась. Не ориентируйтесь на `Content-Type` главного HTML: нужны заголовки самих ресурсов `.br`.
+Открой DevTools → **Network**, найди запросы к `.wasm.br`, `.js.br`, `.data.br`. Проверь `Content-Encoding: br` и соответствующий `Content-Type`.
 
-**Что значит «до 100 МБ».** Здесь бюджет — не более **100 000 000 байт** для всех файлов, которые вы выкладываете в `unity/`. Это строже, чем проверять только Wasm. Дополнительно запишите холодный трафик первого запуска по столбцу **Transferred** в Network. Вес скачивания не равен потреблению памяти после распаковки. Если размер больше, сначала посмотрите крупнейшие файлы, уменьшите разрешение текстур, выберите подходящее сжатие аудио и исключите ненужные сцены и ресурсы. Затем сделайте новый экспорт в чистую папку и измерьте снова.
+Либо:
 
-Если видите `404`, проверьте имя файла и относительные пути Unity. Если не распаковывается Brotli, проверьте `Content-Encoding`. Если Wasm не компилируется потоково, проверьте MIME `application/wasm`. Для финальной проверки используйте и браузер, и `curl`: один заголовок не доказывает, что сцена запустилась.
+```bash
+curl -I http://localhost:8088/unity/Build/ИМЯ_ФАЙЛА.wasm.br
+```
 
-Подробнее в документации — [экспорт и сжатие Unity Web](https://docs.unity.com/en-us/engine/6000.0/manual/platform-specific/webgl/building-distribution/deploying), [настройка Nginx для Unity](https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/webgl/building-distribution/server-configuration-code-samples/web-server-config-nginx), [поддерживаемые ОС Unity 6.0](https://docs.unity.com/en-us/engine/6000.0/manual/get-started/install-and-upgrade/getting-started-installing-unity/system-requirements).
+Замени `ИМЯ_ФАЙЛА` на реальное имя из `unity-build/Build`.
 
-<a id="acceptance"></a>
+### Шаг 177. Проверь лимит 100 МБ
 
-## 12. Приёмка и оформление портфолио
+```bash
+du -sh unity-build
+du -sb unity-build
+```
 
-| Проверка | Что считается результатом |
-| --- | --- |
-| Резюме | На главной ваше имя и роль. Указаны проекты, личный вклад и контакты. Все опубликованные ссылки открываются. |
-| Сервисы | Есть два исполняемых JAR. В Compose у web и repository нет опубликованных портов. Сайт читает данные через отдельный сервис. При отключении repository статическая главная по-прежнему работает. |
-| Каталог и поиск | Номер страницы меняется, прямой переход работает, размер ограничен. Подсказки обновляются при вводе. Enter фильтрует выдачу. Клик открывает точный товар. |
-| Лента | Порции дописываются без повторов. В конце запросы прекращаются. При ошибке доступна кнопка повторной загрузки. |
-| Счётчики | Четыре категории по 12 500, одна пустая. Сумма 50 000. |
-| Доска и файлы | Порядок переживает обновление страницы. При сбое происходит откат. Можно выбрать файл и перетащить его. Файл больше лимита отклоняется. |
-| Интерфейс | Галерея листается, модальное окно работает с клавиатуры, выбор меняет тему. При reduced motion компоненты остаются рабочими. |
-| Unity | Сцена запускается. Wasm отдаётся с правильными MIME и Brotli-заголовком. Суммарный размер экспорта не больше 100 000 000 байт. |
+Для строгой проверки считай **все** файлы, требующиеся для работы сборки: `index.html`, `Build`, `TemplateData` и другие ресурсы. Уточни, что имеется в виду под лимитом — 100 МБ на диске или 100 МБ суммарной передачи — это разные показатели.
 
-Идея для README и собеседования: покажите два `EXPLAIN (ANALYZE, BUFFERS)`, один скриншот переноса карточки и ответ с заголовками Unity. Напишите своими словами, почему лента использует курсор, почему счётчик пустой категории равен нулю и почему веб-сервис не обращается к PostgreSQL напрямую. Это лучше демонстрирует понимание, чем список из семи технологий.
+### Шаги 178–180
 
-Добавьте в `.gitignore` как минимум `/uploads/`, `/unity/` и `.env`. Unity-экспорт можно хранить отдельно от исходников сайта. На случай публикации замените локальные пароли и уберите опубликованный порт БД из публичной конфигурации. На публичном портфолио не оставляйте произвольную загрузку с записью на диск анонимным посетителям. Оставьте локальный предпросмотр, либо подключите авторизацию, квоту, срок хранения и очистку. Для публичной доски используйте демоданные на посетителя или запретите общую анонимную запись. Это не нужно для прохождения практикума на localhost.
+178. Оптимизируй и пересобери Unity, если размер слишком велик.
+179. Протестируй Unity как минимум в Firefox и Chromium.
+180. Для публичного сайта включи HTTPS и проверь требования безопасности WebAssembly/потоков, если используешь многопоточность.
 
-**Если что-то не работает**
+**Контрольная точка №15:** сайт идёт через Nginx, Unity загружается с корректными заголовками, размер контролируется. [Unity: Nginx server configuration](https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/webgl/building-distribution/server-configuration-code-samples/web-server-config-nginx).
 
-| Симптом | Что смотреть первым |
-| --- | --- |
-| IDEA не видит Spring или классы подсвечены красным | Project SDK, Maven Wrapper, Reload All Maven Projects, выбранный модуль |
-| `permission denied` на сокете Docker | Активная сессия и доступ к Docker. После изменения группы войдите заново |
-| `Connection refused` на JDBC | `docker compose ps`, порт `5433` на хосте и `db:5432` внутри сети |
-| Ошибка Flyway checksum | Сравните уже применённую миграцию с исходной. Изменение оформите новой версией |
-| Главная работает, API отдаёт `502` | Логи `repository`, адрес `REPOSITORY_BASE_URL`, доступность БД, таймаут клиента |
-| `403` или `404` на `/unity/` | Открыт порт Nginx `8081`, существует `unity/index.html`, каталог смонтирован |
-| `413` при загрузке | Сверьте лимит Spring на файл/запрос и `client_max_body_size` в Nginx |
-| После перезапуска нет файлов | Убедитесь, что `UPLOAD_DIR` и путь подключения тома совпадают |
+---
 
-Начните с короткого контрольного круга: база в Docker → один запрос напрямую в `repository-service` → тот же запрос через `web-service` → личная главная страница. Затем добавляйте демо по одному. Так каждый новый участок можно проверить отдельно.
+# Часть VII. Тестирование и публикация (шаги 181–200)
 
+## Этап 21. Качество и тесты
+
+| Шаг | Задача |
+|---:|---|
+| 181 | Напиши интеграционный тест `ProductRepository` с PostgreSQL |
+| 182 | Проверь тестами первую, последнюю и пустую страницу |
+| 183 | Проверь поиск по кириллице, разному регистру и пустой строке |
+| 184 | Проверь подсказки при быстром вводе и отмену старых запросов |
+| 185 | Проверь ограничения размера и типа загружаемых файлов |
+| 186 | Проверь транзакционное сохранение порядка Kanban |
+| 187 | Добавь Spring Boot Actuator и health endpoints |
+| 188 | Сделай единый формат ошибок API и логирование |
+| 189 | Проверь мобильную вёрстку, контрастность и навигацию с клавиатуры |
+| 190 | Проверь Lighthouse, Browser Performance и `EXPLAIN ANALYZE` |
+
+Когда начнёшь писать интеграционные тесты, изучи Testcontainers: он помогает запускать изолированную тестовую PostgreSQL, не завися от локальной рабочей базы. [Testcontainers Java](https://java.testcontainers.org/), [Spring Boot testing](https://docs.spring.io/spring-boot/3.5/reference/testing/index.html).
+
+## Этап 22. Публикация портфолио
+
+| Шаг | Задача |
+|---:|---|
+| 191 | Создай репозиторий на GitHub |
+| 192 | Напиши `README.md`: архитектура, требования, сборка, запуск |
+| 193 | Добавь скриншоты каждого демо |
+| 194 | Приложи схему взаимодействия сервисов |
+| 195 | Для каждой технологии опиши **зачем** она использована |
+| 196 | Вынеси продакшен-настройки и секреты в окружение |
+| 197 | Убедись, что в Git нет `.env` с паролями и других секретов |
+| 198 | Настрой HTTPS, резервные копии PostgreSQL и закрытый доступ к внутренним сервисам |
+| 199 | Разверни Docker Compose на сервере |
+| 200 | Замени заглушки реальными данными о себе, ссылками и проектами |
+
+Для публичной публикации также важно ограничить доступ к операциям изменения: без аутентификации неизвестные пользователи смогут создавать/удалять задачи или загружать файлы. Учебные демо лучше сделать доступными только для просмотра, а изменение разрешать в изолированной демо-сессии либо после входа.
+
+---
+
+# Итоговая структура и чек-лист
+
+## Финальная структура репозитория
+
+```text
+portfolio-lab/
+├── web-service/
+│   ├── pom.xml
+│   ├── mvnw
+│   ├── .mvn/
+│   ├── Dockerfile
+│   └── src/main/
+│       ├── java/dev/portfolio/web/
+│       │   ├── WebServiceApplication.java
+│       │   ├── controller/
+│       │   ├── client/
+│       │   └── dto/
+│       └── resources/
+│           ├── application.yaml
+│           └── static/
+│               ├── index.html
+│               ├── catalog.html
+│               ├── board.html
+│               ├── upload.html
+│               ├── gallery.html
+│               ├── ui.html
+│               ├── unity.html
+│               └── assets/
+├── repository-service/
+│   ├── pom.xml
+│   ├── mvnw
+│   ├── .mvn/
+│   ├── Dockerfile
+│   └── src/main/
+│       ├── java/dev/portfolio/repository/
+│       │   ├── RepositoryServiceApplication.java
+│       │   ├── controller/
+│       │   ├── service/
+│       │   ├── repository/
+│       │   └── dto/
+│       └── resources/
+│           ├── application.yaml
+│           └── db/migration/
+│               ├── V1__schema.sql
+│               ├── V2__demo_data.sql
+│               ├── V3__product_search_index.sql
+│               └── V4__board.sql
+├── unity-build/
+│   ├── index.html
+│   ├── Build/
+│   └── TemplateData/
+├── infra/
+│   └── nginx.conf
+├── compose.yaml
+├── .gitignore
+└── README.md
+```
+
+Это **два независимых Maven-проекта**, а не один multi-module Maven: на первом этапе так проще запускать и отлаживать их отдельно. Когда освоишь Maven, можешь изучить общий родительский `pom.xml` и reactor build.
+
+## Чек-лист контрольных точек
+
+- [ ] **№1.** Главная HTML/CSS-страница открывается локально.
+- [ ] **№2.** Резюме адаптивно, темы и навигация работают.
+- [ ] **№3.** Модальные окна и dropdown доступны мышью и клавиатурой.
+- [ ] **№4.** Галерея прокручивается и открывает фото.
+- [ ] **№5.** Каталог умеет поиск, подсказки, фильтры, счётчики и два типа пагинации.
+- [ ] **№6.** Kanban с drag and drop сохраняется в `localStorage`.
+- [ ] **№7.** Зона загрузки показывает выбранные файлы и превью.
+- [ ] **№8.** Сайт работает на Spring Boot и вызывает первый API.
+- [ ] **№9.** `web-service` вызывает отдельный `repository-service` по HTTP.
+- [ ] **№10.** PostgreSQL запущена в Docker и доступна из IDEA.
+- [ ] **№11.** Flyway создал таблицы и 12 000 тестовых строк.
+- [ ] **№12.** Каталог и счётчики идут через SQL, изучен индекс `pg_trgm`.
+- [ ] **№13.** Задачи и файлы сохраняются на сервере после перезапуска.
+- [ ] **№14.** Оба сервиса и PostgreSQL запускаются в Docker Compose.
+- [ ] **№15.** Nginx раздаёт сайт и Unity Web с Brotli.
+
+После каждого завершённого этапа:
+
+```bash
+git status
+git add .
+git commit -m "Describe completed milestone"
+```
+
+**Правило обучения:** перед переходом к следующему шагу ответь на три вопроса: какую проблему мы решали, почему прежнего способа недостаточно, как проверить, что новый способ работает.
+
+## Если ты уже начал проект по прошлому руководству
+
+- Не удаляй `repository-service`, миграции или Docker-том с нужными данными только ради другого порядка изучения.
+- Сделай Git-коммит текущего рабочего состояния; затем можешь отдельно реализовать фронтенд.
+- Если `V1__schema.sql` и `V2__demo_data.sql` уже применялись, **не изменяй их задним числом**. Создавай новые версии миграций либо используй совершенно новую *пустую* учебную базу для прохождения варианта с начала.
+- Если IntelliJ подсвечивает корректный `gin_trgm_ops` красным, проверь диалект SQL, Data Source и фактическую ошибку в логах Flyway.
+- Не пытайся одновременно исправлять Maven Wrapper, настраивать базу и писать сложный фронтенд. Проверяй по одному компоненту.
+
+---
+
+# Официальная документация
+
+Ниже — ссылки на первоисточники. Документацию всегда полезно открывать рядом с IDEA; некоторые разделы в новых версиях продуктов могут называться иначе.
+
+**Arch Linux, IntelliJ, Git**
+
+- [ArchWiki: Java](https://wiki.archlinux.org/title/Java)
+- [ArchWiki: Docker](https://wiki.archlinux.org/title/Docker)
+- [IntelliJ IDEA: Spring Initializr](https://www.jetbrains.com/help/idea/spring-initializr-project-wizard.html)
+- [IntelliJ IDEA: Maven](https://www.jetbrains.com/help/idea/maven-support.html)
+- [IntelliJ IDEA: Database Tool Window](https://www.jetbrains.com/help/idea/database-tool-window.html)
+- [Git: книга Pro Git на русском](https://git-scm.com/book/ru/v2)
+
+**Frontend**
+
+- [MDN: HTML](https://developer.mozilla.org/ru/docs/Learn_web_development/Core/Structuring_content)
+- [MDN: CSS](https://developer.mozilla.org/ru/docs/Learn_web_development/Core/Styling_basics)
+- [MDN: JavaScript](https://developer.mozilla.org/ru/docs/Web/JavaScript)
+- [MDN: Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+- [MDN: localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
+- [MDN: IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API)
+- [MDN: Drag and Drop](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API)
+- [MDN: File API](https://developer.mozilla.org/en-US/docs/Web/API/File_API)
+- [MDN: HTML dialog](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog)
+- [MDN: CSS Scroll Snap](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_scroll_snap)
+- [W3C: WAI-ARIA Listbox](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/)
+
+**Java, Maven, Spring, PostgreSQL**
+
+- [Spring Initializr](https://start.spring.io/)
+- [Apache Maven Wrapper](https://maven.apache.org/tools/wrapper/)
+- [Spring Boot 3.5 Reference](https://docs.spring.io/spring-boot/3.5/reference/)
+- [Spring MVC controllers](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html)
+- [Spring RestClient](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html#rest-restclient)
+- [Spring JdbcClient](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html#jdbc-JdbcClient)
+- [Spring: Uploading Files](https://spring.io/guides/gs/uploading-files)
+- [Flyway documentation](https://documentation.red-gate.com/fd)
+- [PostgreSQL: SQL Tutorial](https://www.postgresql.org/docs/current/tutorial.html)
+- [PostgreSQL: pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html)
+- [Testcontainers Java](https://java.testcontainers.org/)
+
+**Docker, Unity, Nginx**
+
+- [Docker Compose: Getting Started](https://docs.docker.com/compose/gettingstarted/)
+- [Docker Compose Specification](https://docs.docker.com/reference/compose-file/)
+- [Dockerfile Reference](https://docs.docker.com/reference/dockerfile/)
+- [Nginx Documentation](https://nginx.org/en/docs/)
+- [Unity Web: Deployment](https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/webgl/building-distribution/deploying)
+- [Unity Web: Nginx server configuration](https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/webgl/building-distribution/server-configuration-code-samples/web-server-config-nginx)
+
+---
+
+*Конец практикума. Выполняй контрольные точки по очереди: в каждый момент времени у тебя должна оставаться рабочая версия проекта.*
